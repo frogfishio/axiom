@@ -1,0 +1,472 @@
+use crate::ast::*;
+use crate::stdlib;
+use crate::{Env, Value};
+use thiserror::Error;
+
+#[derive(Debug, Error)]
+pub enum EvalError {
+    #[error("Unbound variable: {0}")]
+    UnboundVar(String),
+    #[error("Type error: {0}")]
+    TypeError(String),
+    #[error("Missing key: {0}")]
+    MissingKey(String),
+    #[error("Wrong shape: {0}")]
+    WrongShape(String),
+    #[error("Duplicate key: {0}")]
+    DuplicateKey(String),
+    #[error("Not callable: {0}")]
+    NotCallable(String),
+    #[error("Division by zero")]
+    DivByZero,
+    #[error("Arity mismatch: expected {expected}, got {got}")]
+    ArityMismatch { expected: usize, got: usize },
+}
+
+pub(crate) fn values_equal(a: &Value, b: &Value) -> bool {
+    a == b
+}
+
+pub fn eval_expr(expr: &Expr, env: &Env) -> Result<Value, EvalError> {
+    match expr {
+        Expr::Null => Ok(Value::Null),
+        Expr::Bool(b) => Ok(Value::Bool(*b)),
+        Expr::Num(n) => Ok(Value::Num(*n)),
+        Expr::Str(s) => Ok(Value::Str(s.clone())),
+        Expr::Placeholder => Ok(env.get("_").cloned().unwrap_or_else(|| {
+            Value::Fail_(
+                "t_sda_unbound_placeholder".to_string(),
+                "unbound placeholder".to_string(),
+            )
+        })),
+        Expr::Ident(name) => env
+            .get(name)
+            .cloned()
+            .ok_or_else(|| EvalError::UnboundVar(name.clone())),
+        Expr::Seq(items) => {
+            let values: Result<Vec<Value>, EvalError> =
+                items.iter().map(|item| eval_expr(item, env)).collect();
+            Ok(Value::Seq(values?))
+        }
+        Expr::Set(items) => {
+            let mut values = Vec::new();
+            for item in items {
+                let value = eval_expr(item, env)?;
+                if !values.iter().any(|existing| values_equal(existing, &value)) {
+                    values.push(value);
+                }
+            }
+            Ok(Value::Set(values))
+        }
+        Expr::Bag(items) => {
+            let values: Result<Vec<Value>, EvalError> =
+                items.iter().map(|item| eval_expr(item, env)).collect();
+            Ok(Value::Bag(values?))
+        }
+        Expr::Map(entries) => {
+            let mut result = Vec::new();
+            for (k, v) in entries {
+                result.push((k.clone(), eval_expr(v, env)?));
+            }
+            Ok(Value::Map(result))
+        }
+        Expr::Prod(fields) => {
+            let mut result = Vec::new();
+            for (k, v) in fields {
+                result.push((k.clone(), eval_expr(v, env)?));
+            }
+            Ok(Value::Prod(result))
+        }
+        Expr::BagKV(entries) => {
+            let mut result = Vec::new();
+            for (k, v) in entries {
+                result.push((Value::Str(k.clone()), eval_expr(v, env)?));
+            }
+            Ok(Value::BagKV(result))
+        }
+        Expr::Some_(inner) => Ok(Value::Some_(Box::new(eval_expr(inner, env)?))),
+        Expr::None_ => Ok(Value::None_),
+        Expr::Ok_(inner) => Ok(Value::Ok_(Box::new(eval_expr(inner, env)?))),
+        Expr::Fail_(code_expr, msg_expr) => {
+            let code_value = eval_expr(code_expr, env)?;
+            let msg_value = eval_expr(msg_expr, env)?;
+            let code = match code_value {
+                Value::Str(s) => s,
+                other => format!("{other:?}"),
+            };
+            let msg = match msg_value {
+                Value::Str(s) => s,
+                other => format!("{other:?}"),
+            };
+            Ok(Value::Fail_(code, msg))
+        }
+        Expr::Lambda(param, body) => Ok(Value::Lambda(
+            param.clone(),
+            body.clone(),
+            Box::new(env.clone()),
+        )),
+        Expr::Call(func_expr, args) => {
+            let arg_vals: Result<Vec<Value>, EvalError> =
+                args.iter().map(|arg| eval_expr(arg, env)).collect();
+            let arg_vals = arg_vals?;
+
+            if let Expr::Ident(name) = func_expr.as_ref() {
+                if let Some(result) = stdlib::call_stdlib(name, arg_vals.clone()) {
+                    return result;
+                }
+                let func = env
+                    .get(name)
+                    .cloned()
+                    .ok_or_else(|| EvalError::UnboundVar(name.clone()))?;
+                return apply_lambda(func, arg_vals);
+            }
+
+            let func = eval_expr(func_expr, env)?;
+            apply_lambda(func, arg_vals)
+        }
+        Expr::Pipe(lhs, rhs) => {
+            let lhs_value = eval_expr(lhs, env)?;
+            let mut child_env = env.clone();
+            child_env.insert("_".to_string(), lhs_value);
+            eval_expr(rhs, &child_env)
+        }
+        Expr::Select(obj_expr, field, mode) => {
+            let obj = eval_expr(obj_expr, env)?;
+            eval_select(obj, field, mode)
+        }
+        Expr::UnOp(op, expr) => {
+            let value = eval_expr(expr, env)?;
+            match op {
+                UnOpKind::Neg => match value {
+                    Value::Num(n) => Ok(Value::Num(-n)),
+                    other => Err(EvalError::TypeError(format!("Cannot negate {other:?}"))),
+                },
+                UnOpKind::Not => match value {
+                    Value::Bool(b) => Ok(Value::Bool(!b)),
+                    other => Err(EvalError::TypeError(format!("Cannot not {other:?}"))),
+                },
+            }
+        }
+        Expr::BinOp(op, lhs_expr, rhs_expr) => {
+            let lhs = eval_expr(lhs_expr, env)?;
+            let rhs = eval_expr(rhs_expr, env)?;
+            eval_binop(op, lhs, rhs)
+        }
+        Expr::Comprehension {
+            yield_expr,
+            binding,
+            collection,
+            pred,
+        } => {
+            enum Carrier {
+                Seq,
+                Set,
+                Bag,
+            }
+
+            let coll_val = eval_expr(collection, env)?;
+            let (items, carrier) = match coll_val {
+                Value::Seq(items) => (items, Carrier::Seq),
+                Value::Set(items) => (items, Carrier::Set),
+                Value::Bag(items) => (items, Carrier::Bag),
+                other => {
+                    return Err(EvalError::TypeError(format!(
+                        "Cannot iterate over {other:?}"
+                    )))
+                }
+            };
+
+            let mut results = Vec::new();
+            for item in items {
+                let mut child_env = env.clone();
+                child_env.insert(binding.clone(), item.clone());
+
+                if let Some(pred_expr) = pred {
+                    let pred_val = eval_expr(pred_expr, &child_env)?;
+                    match pred_val {
+                        Value::Bool(false) => continue,
+                        Value::Bool(true) => {}
+                        other => {
+                            return Err(EvalError::TypeError(format!(
+                                "Predicate must be bool, got {other:?}"
+                            )))
+                        }
+                    }
+                }
+
+                let result = if let Some(yield_expr) = yield_expr {
+                    eval_expr(yield_expr, &child_env)?
+                } else {
+                    item
+                };
+                results.push(result);
+            }
+
+            match carrier {
+                Carrier::Seq => Ok(Value::Seq(results)),
+                Carrier::Bag => Ok(Value::Bag(results)),
+                Carrier::Set => {
+                    let mut dedup = Vec::new();
+                    for value in results {
+                        if !dedup.iter().any(|existing| values_equal(existing, &value)) {
+                            dedup.push(value);
+                        }
+                    }
+                    Ok(Value::Set(dedup))
+                }
+            }
+        }
+    }
+}
+
+fn eval_select(obj: Value, field: &str, mode: &SelectMode) -> Result<Value, EvalError> {
+    match &obj {
+        Value::Map(entries) => {
+            let found = entries.iter().find(|(k, _)| k == field).map(|(_, v)| v.clone());
+            match mode {
+                SelectMode::Plain => Ok(found.unwrap_or(Value::Null)),
+                SelectMode::Optional => Ok(found
+                    .map(|v| Value::Some_(Box::new(v)))
+                    .unwrap_or(Value::None_)),
+                SelectMode::Required => Ok(found
+                    .map(|v| Value::Ok_(Box::new(v)))
+                    .unwrap_or_else(|| {
+                        Value::Fail_(
+                            "t_sda_missing_key".to_string(),
+                            "missing key".to_string(),
+                        )
+                    })),
+            }
+        }
+        Value::Prod(fields) => {
+            let found = fields.iter().find(|(k, _)| k == field).map(|(_, v)| v.clone());
+            match mode {
+                SelectMode::Plain => Ok(found.unwrap_or(Value::Null)),
+                SelectMode::Optional => Ok(found
+                    .map(|v| Value::Some_(Box::new(v)))
+                    .unwrap_or(Value::None_)),
+                SelectMode::Required => Ok(found
+                    .map(|v| Value::Ok_(Box::new(v)))
+                    .unwrap_or_else(|| {
+                        Value::Fail_(
+                            "t_sda_missing_key".to_string(),
+                            "missing key".to_string(),
+                        )
+                    })),
+            }
+        }
+        Value::BagKV(entries) => {
+            let matches: Vec<_> = entries
+                .iter()
+                .filter(|(k, _)| matches!(k, Value::Str(s) if s == field))
+                .collect();
+            match mode {
+                SelectMode::Plain => {
+                    Err(EvalError::TypeError("Total projection not valid on BagKV".to_string()))
+                }
+                SelectMode::Optional => match matches.len() {
+                    0 => Ok(Value::None_),
+                    1 => Ok(Value::Some_(Box::new(matches[0].1.clone()))),
+                    _ => Ok(Value::None_),
+                },
+                SelectMode::Required => match matches.len() {
+                    0 => Ok(Value::Fail_(
+                        "t_sda_missing_key".to_string(),
+                        "missing key".to_string(),
+                    )),
+                    1 => Ok(Value::Ok_(Box::new(matches[0].1.clone()))),
+                    _ => Ok(Value::Fail_(
+                        "t_sda_duplicate_key".to_string(),
+                        "duplicate key".to_string(),
+                    )),
+                },
+            }
+        }
+        _ => match mode {
+            SelectMode::Optional => Ok(Value::Fail_(
+                "t_sda_wrong_shape".to_string(),
+                "wrong shape".to_string(),
+            )),
+            SelectMode::Required => Ok(Value::Fail_(
+                "t_sda_wrong_shape".to_string(),
+                "wrong shape".to_string(),
+            )),
+            SelectMode::Plain => Err(EvalError::TypeError(format!("Cannot select from {obj:?}"))),
+        },
+    }
+}
+
+fn eval_binop(op: &BinOpKind, lhs: Value, rhs: Value) -> Result<Value, EvalError> {
+    match op {
+        BinOpKind::Add => match (lhs, rhs) {
+            (Value::Num(a), Value::Num(b)) => Ok(Value::Num(a + b)),
+            (a, b) => Err(EvalError::TypeError(format!("Cannot add {a:?} and {b:?}"))),
+        },
+        BinOpKind::Sub => match (lhs, rhs) {
+            (Value::Num(a), Value::Num(b)) => Ok(Value::Num(a - b)),
+            (a, b) => Err(EvalError::TypeError(format!("Cannot subtract {a:?} and {b:?}"))),
+        },
+        BinOpKind::Mul => match (lhs, rhs) {
+            (Value::Num(a), Value::Num(b)) => Ok(Value::Num(a * b)),
+            (a, b) => Err(EvalError::TypeError(format!("Cannot multiply {a:?} and {b:?}"))),
+        },
+        BinOpKind::Div => match (lhs, rhs) {
+            (Value::Num(a), Value::Num(b)) => {
+                if b == 0.0 {
+                    Err(EvalError::DivByZero)
+                } else {
+                    Ok(Value::Num(a / b))
+                }
+            }
+            (a, b) => Err(EvalError::TypeError(format!("Cannot divide {a:?} and {b:?}"))),
+        },
+        BinOpKind::Concat => match (lhs, rhs) {
+            (Value::Str(a), Value::Str(b)) => Ok(Value::Str(a + &b)),
+            (Value::Seq(mut a), Value::Seq(b)) => {
+                a.extend(b);
+                Ok(Value::Seq(a))
+            }
+            (a, b) => Err(EvalError::TypeError(format!("Cannot concat {a:?} and {b:?}"))),
+        },
+        BinOpKind::Eq => Ok(Value::Bool(values_equal(&lhs, &rhs))),
+        BinOpKind::Neq => Ok(Value::Bool(!values_equal(&lhs, &rhs))),
+        BinOpKind::Lt => match (lhs, rhs) {
+            (Value::Num(a), Value::Num(b)) => Ok(Value::Bool(a < b)),
+            (Value::Str(a), Value::Str(b)) => Ok(Value::Bool(a < b)),
+            (a, b) => Err(EvalError::TypeError(format!("Cannot compare {a:?} and {b:?}"))),
+        },
+        BinOpKind::Le => match (lhs, rhs) {
+            (Value::Num(a), Value::Num(b)) => Ok(Value::Bool(a <= b)),
+            (Value::Str(a), Value::Str(b)) => Ok(Value::Bool(a <= b)),
+            (a, b) => Err(EvalError::TypeError(format!("Cannot compare {a:?} and {b:?}"))),
+        },
+        BinOpKind::Gt => match (lhs, rhs) {
+            (Value::Num(a), Value::Num(b)) => Ok(Value::Bool(a > b)),
+            (Value::Str(a), Value::Str(b)) => Ok(Value::Bool(a > b)),
+            (a, b) => Err(EvalError::TypeError(format!("Cannot compare {a:?} and {b:?}"))),
+        },
+        BinOpKind::Ge => match (lhs, rhs) {
+            (Value::Num(a), Value::Num(b)) => Ok(Value::Bool(a >= b)),
+            (Value::Str(a), Value::Str(b)) => Ok(Value::Bool(a >= b)),
+            (a, b) => Err(EvalError::TypeError(format!("Cannot compare {a:?} and {b:?}"))),
+        },
+        BinOpKind::And => match (lhs, rhs) {
+            (Value::Bool(a), Value::Bool(b)) => Ok(Value::Bool(a && b)),
+            (a, b) => Err(EvalError::TypeError(format!("Cannot 'and' {a:?} and {b:?}"))),
+        },
+        BinOpKind::Or => match (lhs, rhs) {
+            (Value::Bool(a), Value::Bool(b)) => Ok(Value::Bool(a || b)),
+            (a, b) => Err(EvalError::TypeError(format!("Cannot 'or' {a:?} and {b:?}"))),
+        },
+        BinOpKind::Union => match (lhs, rhs) {
+            (Value::Set(mut a), Value::Set(b)) => {
+                for item in b {
+                    if !a.iter().any(|existing| values_equal(existing, &item)) {
+                        a.push(item);
+                    }
+                }
+                Ok(Value::Set(a))
+            }
+            (a, b) => Err(EvalError::TypeError(format!("Union requires sets, got {a:?} and {b:?}"))),
+        },
+        BinOpKind::Inter => match (lhs, rhs) {
+            (Value::Set(a), Value::Set(b)) => {
+                let result = a
+                    .into_iter()
+                    .filter(|x| b.iter().any(|y| values_equal(x, y)))
+                    .collect();
+                Ok(Value::Set(result))
+            }
+            (a, b) => Err(EvalError::TypeError(format!("Inter requires sets, got {a:?} and {b:?}"))),
+        },
+        BinOpKind::Diff => match (lhs, rhs) {
+            (Value::Set(a), Value::Set(b)) => {
+                let result = a
+                    .into_iter()
+                    .filter(|x| !b.iter().any(|y| values_equal(x, y)))
+                    .collect();
+                Ok(Value::Set(result))
+            }
+            (a, b) => Err(EvalError::TypeError(format!("Diff requires sets, got {a:?} and {b:?}"))),
+        },
+        BinOpKind::BUnion => match (lhs, rhs) {
+            (Value::Bag(mut a), Value::Bag(b)) => {
+                a.extend(b);
+                Ok(Value::Bag(a))
+            }
+            (a, b) => Err(EvalError::TypeError(format!("BUnion requires bags, got {a:?} and {b:?}"))),
+        },
+        BinOpKind::BDiff => match (lhs, rhs) {
+            (Value::Bag(a), Value::Bag(b)) => {
+                let mut remaining = b.clone();
+                let result = a
+                    .into_iter()
+                    .filter(|x| {
+                        if let Some(idx) = remaining.iter().position(|y| values_equal(x, y)) {
+                            remaining.remove(idx);
+                            false
+                        } else {
+                            true
+                        }
+                    })
+                    .collect();
+                Ok(Value::Bag(result))
+            }
+            (a, b) => Err(EvalError::TypeError(format!("BDiff requires bags, got {a:?} and {b:?}"))),
+        },
+        BinOpKind::In => match rhs {
+            Value::Seq(items) => Ok(Value::Bool(items.iter().any(|x| values_equal(x, &lhs)))),
+            Value::Set(items) => Ok(Value::Bool(items.iter().any(|x| values_equal(x, &lhs)))),
+            Value::Bag(items) => Ok(Value::Bool(items.iter().any(|x| values_equal(x, &lhs)))),
+            Value::Map(entries) => {
+                if let Value::Str(key) = &lhs {
+                    Ok(Value::Bool(entries.iter().any(|(k, _)| k == key)))
+                } else {
+                    Ok(Value::Bool(false))
+                }
+            }
+            Value::Prod(fields) => {
+                if let Value::Str(key) = &lhs {
+                    Ok(Value::Bool(fields.iter().any(|(k, _)| k == key)))
+                } else {
+                    Ok(Value::Bool(false))
+                }
+            }
+            other => Err(EvalError::TypeError(format!("Cannot check membership in {other:?}"))),
+        },
+    }
+}
+
+pub(crate) fn apply_lambda(func: Value, args: Vec<Value>) -> Result<Value, EvalError> {
+    match func {
+        Value::Lambda(param, body, captured_env) => {
+            if args.len() != 1 {
+                return Err(EvalError::ArityMismatch {
+                    expected: 1,
+                    got: args.len(),
+                });
+            }
+            let mut new_env = *captured_env;
+            new_env.insert(param, args.into_iter().next().unwrap());
+            eval_expr(&body, &new_env)
+        }
+        other => Err(EvalError::NotCallable(format!("{other:?}"))),
+    }
+}
+
+pub fn eval_program(program: &Program, env: &mut Env) -> Result<Option<Value>, EvalError> {
+    let mut last = None;
+    for stmt in &program.stmts {
+        match stmt {
+            Stmt::Let(name, expr) => {
+                let value = eval_expr(expr, env)?;
+                env.insert(name.clone(), value);
+                last = None;
+            }
+            Stmt::Expr(expr) => {
+                last = Some(eval_expr(expr, env)?);
+            }
+        }
+    }
+    Ok(last)
+}

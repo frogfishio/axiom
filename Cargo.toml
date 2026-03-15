@@ -21,3 +21,6 @@ repository = "https://example.com/frogfish/axiom"
 sda-core = { path = "crates/sda-core" }
 enr-core = { path = "crates/enr-core" }
 shape-core = { path = "crates/shape-core" }
+serde_json = "1"
+thiserror = "1"
+clap = { version = "4", features = ["derive"] }
