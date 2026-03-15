@@ -1,0 +1,87 @@
+;; Minimal SDA smoke tests (syntax only)
+
+let x = Seq[1, 2, 3];
+let s = Set{1, 2, 3};
+let b = Bag{1, 2, 1};
+let m = Map{"k" -> 1, "k2" -> 2};
+let r = Prod{name: "steve", age: 11};
+let h = BagKV{"k" -> "v", foo -> 9};
+
+;; unicode identifiers (should lex as Identifier)
+let α = 1;
+let 第一 = 2;
+let имя = 3;
+α + 第一 + имя;
+
+x |> map(y => y + 1);
+x |> map(y ↦ y + 1);
+
+;; unicode selector access (postfix)
+r⟨name⟩;
+r⟨"age"⟩?;
+
+;; ascii selector access (postfix)
+r<name>;
+r<"age">?;
+
+;; stacked selector access (postfix chaining)
+r<name><"age">?;
+
+;; whitespace should not matter for selector access
+r < name >;
+r < "age" > ?;
+
+;; negative cases: should NOT become selector access
+let lt = 1 < 2;
+let tricky = α < β > γ;
+let also_tricky = α<β >γ;
+let also_tricky2 = α <β> γ;
+
+;; comparisons + boolean
+1 = 1;
+1 != 2;
+1 ≠ 2;
+1 < 2;
+1 <= 2;
+1 ≤ 2;
+1 > 0;
+1 >= 0;
+1 ≥ 0;
+
+;; ambiguity stressor: must be chained comparisons, not selector access
+α<β>γ;
+not true or false and true;
+¬true ∨ false ∧ true;
+
+;; membership and set-ish operators
+1 in s;
+1 ∈ s;
+s ⊆ s;
+s union s;
+s ∪ s;
+s inter s;
+s ∩ s;
+s diff s;
+s \ s;
+
+;; bag variants
+s bunion s;
+s ⊎ s;
+s bdiff s;
+s ⊖ s;
+
+;; option/result wrappers
+Some(1);
+None;
+Ok(1);
+Fail("E", "msg");
+
+;; placeholder spellings
+_;
+•;
+
+;; comprehension
+{ yield x | a in s | a = 1 };
+{ yield x ∣ a ∈ s ∣ a = 1 };
+{ a in s | a = 1 };
+{ a ∈ s ∣ a = 1 };

@@ -1,0 +1,230 @@
+module SDA;
+
+backend {
+  prefer: LALR;
+  fallback: Earley;
+  incremental: false;
+}
+
+tokens {
+  ;; Trivia
+  trivia keep WS      = /[ \t\r\n]+/;
+  trivia keep Comment = /;;[^\n]*/;
+
+  ;; Identifiers + literals
+  Identifier = /[A-Za-z_][A-Za-z0-9_]*/;
+  Num        = /\d+/;
+
+  ;; Strings (seed-safe)
+  String     = /\"([^\\\"\n]|\\.)*\"/ | /\'([^\\\'\n]|\\.)*\'/;
+
+  ;; Keywords
+  LetKW   = "let";
+  YieldKW = "yield";
+
+  NullKW  = "null";
+  TrueKW  = "true";
+  FalseKW = "false";
+
+  SeqKW   = "Seq";
+  SetKW   = "Set";
+  BagKW   = "Bag";
+  MapKW   = "Map";
+  ProdKW  = "Prod";
+  BagKVKW = "BagKV";
+
+  SomeKW  = "Some";
+  NoneKW  = "None";
+  OkKW    = "Ok";
+  FailKW  = "Fail";
+
+  UnionKW  = "union";
+  InterKW  = "inter";
+  DiffKW   = "diff";
+  Backslash = "\\";
+  BUnionKW = "bunion";
+  BDiffKW  = "bdiff";
+
+  InKW   = "in";
+  AndKW  = "and";
+  OrKW   = "or";
+  NotKW  = "not";
+
+  ;; Unicode operator spellings (kept as separate string tokens so they retain priority)
+  InSym     = "∈";
+  UnionSym  = "∪";
+  InterSym  = "∩";
+  BUnionSym = "⊎";
+  BDiffSym  = "⊖";
+
+  AndSym = "∧";
+  OrSym  = "∨";
+  NotSym = "¬";
+
+  ;; Operators / punctuation
+  Pipe     = "|>";
+  ArrowAscii = "->";
+  ArrowUni   = "→";
+  LambdaAscii = "=>";
+  LambdaUni   = "↦";
+
+  Eq       = '=';
+  NeqAscii = "!=";
+  NeqUni   = "≠";
+
+  LE       = "<=";
+  LEUni    = "≤";
+  GE       = ">=";
+  GEUni    = "≥";
+  LT       = '<';
+  GT       = '>';
+
+  Plus     = '+';
+  Minus    = '-';
+  Star     = '*';
+  Slash    = '/';
+
+  LParen   = '(';
+  RParen   = ')';
+  LBrack   = '[';
+  RBrack   = ']';
+  LBrace   = '{';
+  RBrace   = '}';
+
+  QMark    = '?';
+  Bang     = '!';
+  Colon    = ':';
+  Comma    = ',';
+  Semi     = ';';
+
+  Bar      = "|";
+  BarUni   = "∣";
+
+  SubsetSym = "⊆";
+
+  SelL = "⟨";
+  SelR = "⟩";
+
+  ;; ASCII selector brackets (disambiguated from LT/GT by the runtime lexer)
+  SelLAscii = '<';
+  SelRAscii = '>';
+
+  Placeholder = "_";
+  Bullet = "•";
+}
+
+rules {
+  Program = Stmt*;
+
+  Stmt = LetStmt | ExprStmt;
+
+  LetStmt = LetKW Identifier Eq Expr Semi;
+  ExprStmt = Expr Semi;
+
+  ;; Expressions (precedence encoded by layering)
+
+  Expr = PipeExpr;
+
+  PipeExpr = OrExpr (Pipe OrExpr)*;
+  OrExpr = AndExpr (OrOp AndExpr)*;
+  OrOp = OrKW | OrSym;
+
+  AndExpr = NotExpr (AndOp NotExpr)*;
+  AndOp = AndKW | AndSym;
+
+  NotExpr = NotOp NotExpr | CmpExpr;
+  NotOp = NotKW | NotSym;
+
+  CmpExpr = Setish (CmpOp Setish)*;
+  CmpOp = Eq | NeqAscii | NeqUni | LT | LE | LEUni | GT | GE | GEUni | SubsetSym;
+
+  Setish = Add (SetishOp Add)*;
+  SetishOp = UnionKW | UnionSym | InterKW | InterSym | DiffKW | Backslash | BUnionKW | BUnionSym | BDiffKW | BDiffSym | InKW | InSym;
+
+  Add = Mul (AddOp Mul)*;
+  AddOp = Plus | Minus;
+
+  Mul = Unary (MulOp Unary)*;
+  MulOp = Star | Slash;
+
+  Unary = Minus Unary | Postfix;
+
+  Postfix = Primary PostfixOp*;
+
+  PostfixOp = SelectorAccess | CallSuffix;
+
+  SelLTok = SelL | SelLAscii;
+  SelRTok = SelR | SelRAscii;
+
+  SelectorAccess = SelLTok Selector SelRTok (QMark | Bang)?;
+
+  CallSuffix = LParen (ArgList)? RParen;
+  ArgList = Expr (Comma Expr)*;
+
+  Primary =
+      Literal
+    | Placeholder
+    | Bullet
+    | ParenExpr
+    | Comprehension
+    | IdentOrLambda
+    ;
+
+  ParenExpr = LParen Expr RParen;
+
+  IdentOrLambda = Identifier (LambdaTok Expr)?;
+
+  LambdaTok = LambdaAscii | LambdaUni;
+  ArrowTok = ArrowAscii | ArrowUni;
+  BarTok = Bar | BarUni;
+
+  Selector = Identifier | String;
+
+  ;; Literals
+
+  Literal =
+      NullKW
+    | TrueKW
+    | FalseKW
+    | Num
+    | String
+    | SeqLit
+    | SetLit
+    | BagLit
+    | MapLit
+    | ProdLit
+    | BagKVLit
+    | OptLit
+    | ResLit
+    ;
+
+  SeqLit = SeqKW LBrack (ExprList)? RBrack;
+  SetLit = SetKW LBrace (ExprList)? RBrace;
+  BagLit = BagKW LBrace (ExprList)? RBrace;
+
+  ExprList = Expr (Comma Expr)*;
+
+  MapLit = MapKW LBrace (MapEntryList)? RBrace;
+  MapEntryList = MapEntry (Comma MapEntry)*;
+  MapEntry = String ArrowTok Expr;
+
+  ProdLit = ProdKW LBrace (ProdFieldList)? RBrace;
+  ProdFieldList = ProdField (Comma ProdField)*;
+  ProdField = Identifier Colon Expr;
+
+  BagKVLit = BagKVKW LBrace (BindEntryList)? RBrace;
+  BindEntryList = BindEntry (Comma BindEntry)*;
+  BindEntry = Selector ArrowTok Expr;
+
+  OptLit = SomeKW LParen Expr RParen | NoneKW;
+
+  ResLit = OkKW LParen Expr RParen | FailKW LParen Expr Comma Expr RParen;
+
+  Comprehension = LBrace ComprBody RBrace;
+  ComprBody = ComprWithYield | ComprNoYield;
+
+  ComprNoYield = Identifier InOp Expr (ComprPred)?;
+  ComprWithYield = YieldKW Expr BarTok Identifier InOp Expr (ComprPred)?;
+  InOp = InKW | InSym;
+  ComprPred = BarTok Expr;
+}

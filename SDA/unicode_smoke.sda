@@ -1,0 +1,4 @@
+;; unicode lexing smoke
+
+;; This should tokenize as a single SelL token (⟨) and parse.
+⟨;

@@ -1,0 +1,19 @@
+module SDAUnicode;
+
+backend {
+  prefer: LALR;
+  fallback: Earley;
+  incremental: false;
+}
+
+tokens {
+  trivia keep WS = /[ \t\r\n]+/;
+  trivia keep Comment = /;;[^\n]*/;
+
+  SelL = "⟨";
+  Semi = ';';
+}
+
+rules {
+  Program = SelL Semi;
+}
