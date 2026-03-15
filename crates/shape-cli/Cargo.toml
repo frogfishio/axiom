@@ -1,0 +1,10 @@
+[package]
+name = "shape-cli"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+
+[dependencies]
+shape-core.workspace = true

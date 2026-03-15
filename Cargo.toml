@@ -1,0 +1,23 @@
+[workspace]
+members = [
+  "crates/axiom-cli",
+  "crates/enr-cli",
+  "crates/enr-core",
+  "crates/sda-cli",
+  "crates/sda-core",
+  "crates/shape-cli",
+  "crates/shape-core",
+]
+resolver = "3"
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+license = "MIT OR Apache-2.0"
+authors = ["Frogfish"]
+repository = "https://example.com/frogfish/axiom"
+
+[workspace.dependencies]
+sda-core = { path = "crates/sda-core" }
+enr-core = { path = "crates/enr-core" }
+shape-core = { path = "crates/shape-core" }
