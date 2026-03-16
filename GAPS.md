@@ -2,6 +2,9 @@
 
 This file tracks the work needed to turn the current SDA seed runtime into the canonical implementation for this repository.
 
+Current note:
+Exact numeric semantics now use an exact rational representation. Non-terminating rationals are bridged through a canonical JSON wrapper (`{"$type":"num","$value":"p/q"}`), but the broader JSON bridge for all value kinds still needs a fuller canonicalization pass.
+
 ## Migration
 
 - [ ] Remove the legacy nested Rust workspace under `SDA/sda` after the top-level port is stable.
@@ -10,17 +13,17 @@ This file tracks the work needed to turn the current SDA seed runtime into the c
 
 ## Determinism And Canonical Semantics
 
-- [ ] Replace `f64` numbers with an exact numeric representation that preserves equality and canonical round-tripping.
-- [ ] Make `Bag` equality extensional with multiplicity rather than insertion-order based.
-- [ ] Make `Map` equality extensional rather than insertion-order based.
-- [ ] Confirm whether `Prod` equality should also be extensional and implement the chosen contract explicitly.
-- [ ] Remove implicit ambient `_` input binding from the public `run` path, or document and rename it as an explicit host input variable if that is the intended contract.
+- [x] Replace `f64` numbers with an exact numeric representation that preserves equality and canonical round-tripping.
+- [x] Make `Bag` equality extensional with multiplicity rather than insertion-order based.
+- [x] Make `Map` equality extensional rather than insertion-order based.
+- [x] Confirm whether `Prod` equality should also be extensional and implement the chosen contract explicitly.
+- [x] Remove implicit ambient `_` input binding from the public `run` path and replace it with an explicit host input binding.
 
 ## Surface Conformance
 
-- [ ] Restrict standalone `Map` literal keys to string literals only.
+- [x] Restrict standalone `Map` literal keys to string literals only.
 - [ ] Decide whether `BagKV` literal keys should remain permissive or be aligned more tightly with the standalone surface.
-- [ ] Expand comprehension parsing to support the full intended expression surface, not only identifier-led shorthand forms.
+- [x] Expand comprehension parsing to support the full intended expression surface, not only identifier-led shorthand forms.
 - [ ] Add tests for Unicode and ASCII synonym parity across all supported operators.
 - [ ] Add tests for comment handling, whitespace insensitivity, and string escape semantics from the spec.
 
@@ -28,7 +31,7 @@ This file tracks the work needed to turn the current SDA seed runtime into the c
 
 - [ ] Implement the `Bytes` value kind end-to-end: syntax, runtime value, JSON or host bridge, and tests.
 - [ ] Decide and document canonical JSON bridging rules for non-JSON carriers and wrapper values.
-- [ ] Revisit `keys(map)` so it returns the carrier required by the spec.
+- [x] Revisit `keys(map)` so it returns the carrier required by the spec.
 - [ ] Confirm `values(map)` ordering semantics and document whether they are canonical or host-derived.
 
 ## Errors And Diagnostics

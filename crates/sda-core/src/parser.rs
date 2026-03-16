@@ -420,13 +420,13 @@ impl Parser {
                 self.expect(TokenKind::LBrace)?;
                 let mut entries = Vec::new();
                 if *self.peek() != TokenKind::RBrace {
-                    entries.push(self.parse_map_entry()?);
+                    entries.push(self.parse_bagkv_entry()?);
                     while *self.peek() == TokenKind::Comma {
                         self.advance();
                         if *self.peek() == TokenKind::RBrace {
                             break;
                         }
-                        entries.push(self.parse_map_entry()?);
+                        entries.push(self.parse_bagkv_entry()?);
                     }
                 }
                 self.expect(TokenKind::RBrace)?;
@@ -475,9 +475,7 @@ impl Parser {
             self.advance();
             let yield_expr = self.parse_expr()?;
             self.expect(TokenKind::Bar)?;
-            let binding = self.expect_ident()?;
-            self.expect(TokenKind::In)?;
-            let collection = self.parse_expr()?;
+            let (binding, collection) = self.parse_generator_expr()?;
             let pred = if *self.peek() == TokenKind::Bar {
                 self.advance();
                 Some(Box::new(self.parse_expr()?))
@@ -493,11 +491,8 @@ impl Parser {
             });
         }
 
-        let first_ident = self.expect_ident()?;
-
-        if *self.peek() == TokenKind::In {
-            self.advance();
-            let collection = self.parse_expr()?;
+        let first_expr = self.parse_expr()?;
+        if let Some((binding, collection)) = Self::decompose_generator_expr(first_expr.clone()) {
             let pred = if *self.peek() == TokenKind::Bar {
                 self.advance();
                 Some(Box::new(self.parse_expr()?))
@@ -505,34 +500,49 @@ impl Parser {
                 None
             };
             self.expect(TokenKind::RBrace)?;
-            Ok(Expr::Comprehension {
+            return Ok(Expr::Comprehension {
                 yield_expr: None,
-                binding: first_ident,
-                collection: Box::new(collection),
-                pred,
-            })
-        } else if *self.peek() == TokenKind::Bar {
-            self.advance();
-            let binding = self.expect_ident()?;
-            self.expect(TokenKind::In)?;
-            let collection = self.parse_expr()?;
-            let pred = if *self.peek() == TokenKind::Bar {
-                self.advance();
-                Some(Box::new(self.parse_expr()?))
-            } else {
-                None
-            };
-            self.expect(TokenKind::RBrace)?;
-            Ok(Expr::Comprehension {
-                yield_expr: Some(Box::new(Expr::Ident(first_ident))),
                 binding,
                 collection: Box::new(collection),
                 pred,
-            })
+            });
+        }
+
+        self.expect(TokenKind::Bar)?;
+        let (binding, collection) = self.parse_generator_expr()?;
+        let pred = if *self.peek() == TokenKind::Bar {
+            self.advance();
+            Some(Box::new(self.parse_expr()?))
         } else {
-            let token = self.peek().clone();
-            let pos = self.peek_pos();
-            Err(ParseError::Unexpected(token, pos))
+            None
+        };
+        self.expect(TokenKind::RBrace)?;
+        Ok(Expr::Comprehension {
+            yield_expr: Some(Box::new(first_expr)),
+            binding,
+            collection: Box::new(collection),
+            pred,
+        })
+    }
+
+    fn parse_generator_expr(&mut self) -> Result<(String, Expr), ParseError> {
+        let expr = self.parse_expr()?;
+        Self::decompose_generator_expr(expr).ok_or_else(|| {
+            ParseError::Expected(
+                "generator expression `name in collection`".to_string(),
+                self.peek().clone(),
+                self.peek_pos(),
+            )
+        })
+    }
+
+    fn decompose_generator_expr(expr: Expr) -> Option<(String, Expr)> {
+        match expr {
+            Expr::BinOp(BinOpKind::In, lhs, rhs) => match *lhs {
+                Expr::Ident(name) => Some((name, *rhs)),
+                _ => None,
+            },
+            _ => None,
         }
     }
 
@@ -558,13 +568,29 @@ impl Parser {
                 self.advance();
                 s
             }
+            token => {
+                let pos = self.peek_pos();
+                return Err(ParseError::Expected("string literal map key".to_string(), token, pos));
+            }
+        };
+        self.expect(TokenKind::Arrow)?;
+        let value = self.parse_expr()?;
+        Ok((key, value))
+    }
+
+    fn parse_bagkv_entry(&mut self) -> Result<(String, Expr), ParseError> {
+        let key = match self.peek().clone() {
+            TokenKind::Str(s) => {
+                self.advance();
+                s
+            }
             TokenKind::Ident(name) => {
                 self.advance();
                 name
             }
             token => {
                 let pos = self.peek_pos();
-                return Err(ParseError::Expected("map key".to_string(), token, pos));
+                return Err(ParseError::Expected("bagkv key".to_string(), token, pos));
             }
         };
         self.expect(TokenKind::Arrow)?;

@@ -1,3 +1,4 @@
+use crate::number::ExactNum;
 use crate::eval::{apply_lambda, EvalError};
 use crate::Value;
 
@@ -59,19 +60,27 @@ fn stdlib_type_of(args: Vec<Value>) -> Result<Value, EvalError> {
 fn stdlib_keys(args: Vec<Value>) -> Result<Value, EvalError> {
     check_arity("keys", &args, 1)?;
     match &args[0] {
-        Value::Map(entries) => Ok(Value::Seq(
+        Value::Map(entries) => Ok(Value::Set(
             entries
                 .iter()
                 .map(|(k, _)| Value::Str(k.clone()))
                 .collect(),
         )),
-        Value::Prod(fields) => Ok(Value::Seq(
+        Value::Prod(fields) => Ok(Value::Set(
             fields
                 .iter()
                 .map(|(k, _)| Value::Str(k.clone()))
                 .collect(),
         )),
-        Value::BagKV(pairs) => Ok(Value::Seq(pairs.iter().map(|(k, _)| k.clone()).collect())),
+        Value::BagKV(pairs) => {
+            let mut keys = Vec::new();
+            for (key, _) in pairs {
+                if !keys.iter().any(|existing| existing == key) {
+                    keys.push(key.clone());
+                }
+            }
+            Ok(Value::Set(keys))
+        }
         other => Err(EvalError::TypeError(format!(
             "keys() requires map, prod, or bagkv, got {other:?}"
         ))),
@@ -106,7 +115,7 @@ fn stdlib_count(args: Vec<Value>) -> Result<Value, EvalError> {
             )))
         }
     };
-    Ok(Value::Num(n as f64))
+    Ok(Value::Num(ExactNum::from_usize(n)))
 }
 
 fn stdlib_normalize_unique(args: Vec<Value>) -> Result<Value, EvalError> {

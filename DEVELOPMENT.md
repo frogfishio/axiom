@@ -11,7 +11,8 @@ This repository is a Rust workspace. The active SDA implementation now lives in 
 cargo test --workspace
 cargo test -p sda-core
 cargo run -p sda-cli --bin sda -- '1 + 2'
-echo '{"name":"Ada"}' | cargo run -p sda-cli --bin sda -- '_<"name">'
+echo '{"name":"Ada"}' | cargo run -p sda-cli --bin sda -- 'input<"name">'
+echo '{"name":"Ada"}' | cargo run -p sda-cli --bin sda -- --bind root 'root<"name">'
 ```
 
 If you want shorter commands, the workspace defines cargo aliases in `.cargo/config.toml`:
@@ -34,3 +35,4 @@ cargo sda-run -- '1 + 2'
 - Fix semantic gaps at the root rather than adding compatibility shims.
 - Prefer adding conformance-style tests before changing evaluator behavior.
 - Keep `sda-core` pure; no ambient IO in the evaluator or stdlib.
+- Standalone host input is bound explicitly. The default binding is `input`, and `_` remains reserved for pipe placeholder semantics.

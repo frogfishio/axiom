@@ -1,8 +1,10 @@
+use crate::number::ExactNum;
+
 #[derive(Debug, Clone)]
 pub enum Expr {
     Null,
     Bool(bool),
-    Num(f64),
+    Num(ExactNum),
     Str(String),
     Ident(String),
     Placeholder,

@@ -8,6 +8,9 @@ struct Cli {
     expression: Option<String>,
     /// Input JSON file. Reads stdin if omitted.
     file: Option<std::path::PathBuf>,
+    /// Identifier bound to the host input value.
+    #[arg(long, default_value = "input")]
+    bind: String,
 }
 
 fn main() {
@@ -29,7 +32,7 @@ fn main() {
         serde_json::from_str(&input_str).unwrap_or(serde_json::Value::Null);
 
     let result = if let Some(expr) = cli.expression {
-        sda_core::run(&expr, input_json).unwrap_or_else(|error| {
+        sda_core::run_with_input_binding(&expr, &cli.bind, input_json).unwrap_or_else(|error| {
             eprintln!("Error: {error}");
             std::process::exit(1);
         })

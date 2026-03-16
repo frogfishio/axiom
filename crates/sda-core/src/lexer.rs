@@ -1,5 +1,7 @@
 use thiserror::Error;
 
+use crate::number::{ExactNum, ParseNumError};
+
 #[derive(Debug, Clone)]
 pub enum TokenKind {
     Let,
@@ -56,7 +58,7 @@ pub enum TokenKind {
     SelR,
     Ident(String),
     Str(String),
-    Num(f64),
+    Num(ExactNum),
     Placeholder,
     Eof,
 }
@@ -64,7 +66,7 @@ pub enum TokenKind {
 impl PartialEq for TokenKind {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
-            (TokenKind::Num(a), TokenKind::Num(b)) => a.to_bits() == b.to_bits(),
+            (TokenKind::Num(a), TokenKind::Num(b)) => a == b,
             (TokenKind::Ident(a), TokenKind::Ident(b)) => a == b,
             (TokenKind::Str(a), TokenKind::Str(b)) => a == b,
             _ => std::mem::discriminant(self) == std::mem::discriminant(other),
@@ -84,6 +86,13 @@ pub enum LexError {
     UnexpectedChar(char, usize),
     #[error("Unterminated string at position {0}")]
     UnterminatedString(usize),
+    #[error("Invalid numeric literal '{literal}' at position {pos}: {source}")]
+    InvalidNumber {
+        literal: String,
+        pos: usize,
+        #[source]
+        source: ParseNumError,
+    },
 }
 
 pub fn lex(src: &str) -> Result<Vec<Token>, LexError> {
@@ -122,7 +131,11 @@ pub fn lex(src: &str) -> Result<Vec<Token>, LexError> {
                 }
             }
             let num_str: String = chars[num_start..pos].iter().collect();
-            let n: f64 = num_str.parse().unwrap();
+            let n = ExactNum::parse_literal(&num_str).map_err(|source| LexError::InvalidNumber {
+                literal: num_str.clone(),
+                pos: start,
+                source,
+            })?;
             tokens.push(Token {
                 kind: TokenKind::Num(n),
                 pos: start,

@@ -31,7 +31,7 @@ pub fn eval_expr(expr: &Expr, env: &Env) -> Result<Value, EvalError> {
     match expr {
         Expr::Null => Ok(Value::Null),
         Expr::Bool(b) => Ok(Value::Bool(*b)),
-        Expr::Num(n) => Ok(Value::Num(*n)),
+        Expr::Num(n) => Ok(Value::Num(n.clone())),
         Expr::Str(s) => Ok(Value::Str(s.clone())),
         Expr::Placeholder => Ok(env.get("_").cloned().unwrap_or_else(|| {
             Value::Fail_(
@@ -138,7 +138,7 @@ pub fn eval_expr(expr: &Expr, env: &Env) -> Result<Value, EvalError> {
             let value = eval_expr(expr, env)?;
             match op {
                 UnOpKind::Neg => match value {
-                    Value::Num(n) => Ok(Value::Num(-n)),
+                    Value::Num(n) => Ok(Value::Num(n.neg())),
                     other => Err(EvalError::TypeError(format!("Cannot negate {other:?}"))),
                 },
                 UnOpKind::Not => match value {
@@ -169,6 +169,13 @@ pub fn eval_expr(expr: &Expr, env: &Env) -> Result<Value, EvalError> {
                 Value::Seq(items) => (items, Carrier::Seq),
                 Value::Set(items) => (items, Carrier::Set),
                 Value::Bag(items) => (items, Carrier::Bag),
+                Value::BagKV(entries) => (
+                    entries
+                        .into_iter()
+                        .map(|(key, value)| Value::Bind(Box::new(key), Box::new(value)))
+                        .collect(),
+                    Carrier::Bag,
+                ),
                 other => {
                     return Err(EvalError::TypeError(format!(
                         "Cannot iterate over {other:?}"
@@ -255,6 +262,27 @@ fn eval_select(obj: Value, field: &str, mode: &SelectMode) -> Result<Value, Eval
                     })),
             }
         }
+        Value::Bind(key, value) => {
+            let found = match field {
+                "key" => Some((**key).clone()),
+                "val" => Some((**value).clone()),
+                _ => None,
+            };
+            match mode {
+                SelectMode::Plain => Ok(found.unwrap_or(Value::Null)),
+                SelectMode::Optional => Ok(found
+                    .map(|v| Value::Some_(Box::new(v)))
+                    .unwrap_or(Value::None_)),
+                SelectMode::Required => Ok(found
+                    .map(|v| Value::Ok_(Box::new(v)))
+                    .unwrap_or_else(|| {
+                        Value::Fail_(
+                            "t_sda_missing_key".to_string(),
+                            "missing key".to_string(),
+                        )
+                    })),
+            }
+        }
         Value::BagKV(entries) => {
             let matches: Vec<_> = entries
                 .iter()
@@ -299,23 +327,23 @@ fn eval_select(obj: Value, field: &str, mode: &SelectMode) -> Result<Value, Eval
 fn eval_binop(op: &BinOpKind, lhs: Value, rhs: Value) -> Result<Value, EvalError> {
     match op {
         BinOpKind::Add => match (lhs, rhs) {
-            (Value::Num(a), Value::Num(b)) => Ok(Value::Num(a + b)),
+            (Value::Num(a), Value::Num(b)) => Ok(Value::Num(a.add(&b))),
             (a, b) => Err(EvalError::TypeError(format!("Cannot add {a:?} and {b:?}"))),
         },
         BinOpKind::Sub => match (lhs, rhs) {
-            (Value::Num(a), Value::Num(b)) => Ok(Value::Num(a - b)),
+            (Value::Num(a), Value::Num(b)) => Ok(Value::Num(a.sub(&b))),
             (a, b) => Err(EvalError::TypeError(format!("Cannot subtract {a:?} and {b:?}"))),
         },
         BinOpKind::Mul => match (lhs, rhs) {
-            (Value::Num(a), Value::Num(b)) => Ok(Value::Num(a * b)),
+            (Value::Num(a), Value::Num(b)) => Ok(Value::Num(a.mul(&b))),
             (a, b) => Err(EvalError::TypeError(format!("Cannot multiply {a:?} and {b:?}"))),
         },
         BinOpKind::Div => match (lhs, rhs) {
             (Value::Num(a), Value::Num(b)) => {
-                if b == 0.0 {
+                if b.is_zero() {
                     Err(EvalError::DivByZero)
                 } else {
-                    Ok(Value::Num(a / b))
+                    Ok(Value::Num(a.div(&b)))
                 }
             }
             (a, b) => Err(EvalError::TypeError(format!("Cannot divide {a:?} and {b:?}"))),
