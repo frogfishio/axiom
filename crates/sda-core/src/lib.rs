@@ -290,6 +290,74 @@ pub fn from_json(v: serde_json::Value) -> Value {
     }
 }
 
+fn canonical_json_text(value: &serde_json::Value) -> String {
+    match value {
+        serde_json::Value::Null | serde_json::Value::Bool(_) | serde_json::Value::Number(_) | serde_json::Value::String(_) => {
+            serde_json::to_string(value).expect("canonical JSON rendering should succeed")
+        }
+        serde_json::Value::Array(items) => {
+            let rendered_items = items
+                .iter()
+                .map(canonical_json_text)
+                .collect::<Vec<_>>()
+                .join(",");
+            format!("[{rendered_items}]")
+        }
+        serde_json::Value::Object(entries) => {
+            let mut sorted_entries: Vec<_> = entries.iter().collect();
+            sorted_entries.sort_by(|(left_key, _), (right_key, _)| left_key.cmp(right_key));
+            let rendered_entries = sorted_entries
+                .into_iter()
+                .map(|(key, value)| {
+                    format!(
+                        "{}:{}",
+                        serde_json::to_string(key)
+                            .expect("canonical JSON key rendering should succeed"),
+                        canonical_json_text(value)
+                    )
+                })
+                .collect::<Vec<_>>()
+                .join(",");
+            format!("{{{rendered_entries}}}")
+        }
+    }
+}
+
+fn canonicalize_set_items(items: Vec<Value>) -> Vec<serde_json::Value> {
+    let mut unique = Vec::new();
+    for item in items {
+        if !unique.iter().any(|existing| existing == &item) {
+            unique.push(item);
+        }
+    }
+
+    let mut rendered = unique.into_iter().map(to_json).collect::<Vec<_>>();
+    rendered.sort_by_key(canonical_json_text);
+    rendered
+}
+
+fn canonicalize_bag_items(items: Vec<Value>) -> Vec<serde_json::Value> {
+    let mut rendered = items.into_iter().map(to_json).collect::<Vec<_>>();
+    rendered.sort_by_key(canonical_json_text);
+    rendered
+}
+
+fn canonicalize_map_entries(entries: Vec<(String, Value)>) -> Vec<(String, serde_json::Value)> {
+    let mut mapped_entries: Vec<(String, serde_json::Value)> =
+        entries.into_iter().map(|(key, value)| (key, to_json(value))).collect();
+    mapped_entries.sort_by(|(left_key, _), (right_key, _)| left_key.cmp(right_key));
+    mapped_entries
+}
+
+fn canonicalize_bagkv_items(pairs: Vec<(Value, Value)>) -> Vec<serde_json::Value> {
+    let mut rendered = pairs
+        .into_iter()
+        .map(|(key, value)| serde_json::json!([to_json(key), to_json(value)]))
+        .collect::<Vec<_>>();
+    rendered.sort_by_key(canonical_json_text);
+    rendered
+}
+
 pub fn to_json(v: Value) -> serde_json::Value {
     match v {
         Value::Null => serde_json::Value::Null,
@@ -303,15 +371,14 @@ pub fn to_json(v: Value) -> serde_json::Value {
         Value::Seq(items) => serde_json::Value::Array(items.into_iter().map(to_json).collect()),
         Value::Set(items) => serde_json::json!({
             "$type": "set",
-            "$items": items.into_iter().map(to_json).collect::<Vec<_>>()
+            "$items": canonicalize_set_items(items)
         }),
         Value::Bag(items) => serde_json::json!({
             "$type": "bag",
-            "$items": items.into_iter().map(to_json).collect::<Vec<_>>()
+            "$items": canonicalize_bag_items(items)
         }),
         Value::Map(entries) => {
-            let mapped_entries: Vec<(String, serde_json::Value)> =
-                entries.into_iter().map(|(k, v)| (k, to_json(v))).collect();
+            let mapped_entries = canonicalize_map_entries(entries);
             if should_wrap_map(&mapped_entries) {
                 let entries_obj: serde_json::Map<String, serde_json::Value> =
                     mapped_entries.into_iter().collect();
@@ -340,10 +407,7 @@ pub fn to_json(v: Value) -> serde_json::Value {
         }
         Value::BagKV(pairs) => serde_json::json!({
             "$type": "bagkv",
-            "$items": pairs
-                .into_iter()
-                .map(|(k, v)| serde_json::json!([to_json(k), to_json(v)]))
-                .collect::<Vec<_>>()
+            "$items": canonicalize_bagkv_items(pairs)
         }),
         Value::Bind(k, v) => serde_json::json!({
             "$type": "bind",
@@ -669,6 +733,76 @@ mod tests {
     }
 
     #[test]
+    fn test_set_union_is_canonical_and_commutative() {
+        let left_first = r("Set{3, 1} union Set{2, 1};");
+        let right_first = r("Set{2, 1} union Set{3, 1};");
+        let expected = serde_json::json!({"$type": "set", "$items": [1, 2, 3]});
+        assert_eq!(left_first, expected);
+        assert_eq!(right_first, expected);
+    }
+
+    #[test]
+    fn test_set_intersection_is_canonical_and_idempotent() {
+        let intersection = r("Set{3, 1, 2} inter Set{2, 3, 4};");
+        let idempotent = r("Set{3, 1, 2} inter Set{3, 1, 2};");
+        assert_eq!(intersection, serde_json::json!({"$type": "set", "$items": [2, 3]}));
+        assert_eq!(idempotent, serde_json::json!({"$type": "set", "$items": [1, 2, 3]}));
+    }
+
+    #[test]
+    fn test_set_difference_is_canonical_and_self_difference_is_empty() {
+        assert_eq!(
+            r("Set{3, 1, 2} diff Set{2};"),
+            serde_json::json!({"$type": "set", "$items": [1, 3]})
+        );
+        assert_eq!(
+            r("Set{3, 1, 2} diff Set{3, 1, 2};"),
+            serde_json::json!({"$type": "set", "$items": []})
+        );
+    }
+
+    #[test]
+    fn test_bag_union_is_canonical_and_commutative() {
+        let left_first = r("Bag{3, 1, 2} bunion Bag{2, 1};");
+        let right_first = r("Bag{2, 1} bunion Bag{3, 1, 2};");
+        let expected = serde_json::json!({"$type": "bag", "$items": [1, 1, 2, 2, 3]});
+        assert_eq!(left_first, expected);
+        assert_eq!(right_first, expected);
+    }
+
+    #[test]
+    fn test_bag_difference_is_canonical_and_floors_at_zero() {
+        assert_eq!(
+            r("Bag{3, 1, 2, 2, 1} bdiff Bag{2, 1, 4};"),
+            serde_json::json!({"$type": "bag", "$items": [1, 2, 3]})
+        );
+        assert_eq!(
+            r("Bag{1, 1} bdiff Bag{1, 1, 1};"),
+            serde_json::json!({"$type": "bag", "$items": []})
+        );
+    }
+
+    #[test]
+    fn test_set_algebra_is_associative_where_expected() {
+        assert_eq!(
+            r("(Set{3, 1} union Set{2}) union Set{4, 1};"),
+            r("Set{3, 1} union (Set{2} union Set{4, 1});")
+        );
+        assert_eq!(
+            r("(Set{3, 1, 2} inter Set{2, 3, 4}) inter Set{3, 5};"),
+            r("Set{3, 1, 2} inter (Set{2, 3, 4} inter Set{3, 5});")
+        );
+    }
+
+    #[test]
+    fn test_bag_union_is_associative() {
+        assert_eq!(
+            r("(Bag{3, 1} bunion Bag{2}) bunion Bag{2, 1};"),
+            r("Bag{3, 1} bunion (Bag{2} bunion Bag{2, 1});")
+        );
+    }
+
+    #[test]
     fn test_prod_equality_is_extensional() {
         assert_eq!(
             r(r#"Prod{a: 1, b: 2} = Prod{b: 2, a: 1};"#),
@@ -794,7 +928,7 @@ mod tests {
             result,
             serde_json::json!({
                 "$type": "set",
-                "$items": ["b", "a"]
+                "$items": ["a", "b"]
             })
         );
     }
@@ -979,15 +1113,57 @@ mod tests {
     }
 
     #[test]
+    fn test_normalize_unique_wrong_shape_returns_fail() {
+        let result = r(r#"normalizeUnique(Seq[1, 2]);"#);
+        assert_eq!(
+            result,
+            serde_json::json!({"$type": "fail", "$code": "t_sda_wrong_shape", "$msg": "wrong shape"})
+        );
+    }
+
+    #[test]
     fn test_normalize_first() {
         let result = r(r#"normalizeFirst(BagKV{"k" -> 1, "k" -> 2});"#);
         assert_eq!(result, serde_json::json!({"k": 1}));
     }
 
     #[test]
+    fn test_normalize_first_wrong_shape_returns_fail() {
+        let result = r(r#"normalizeFirst(Seq[1, 2]);"#);
+        assert_eq!(
+            result,
+            serde_json::json!({"$type": "fail", "$code": "t_sda_wrong_shape", "$msg": "wrong shape"})
+        );
+    }
+
+    #[test]
     fn test_normalize_last() {
         let result = r(r#"normalizeLast(BagKV{"k" -> 1, "k" -> 2});"#);
         assert_eq!(result, serde_json::json!({"k": 2}));
+    }
+
+    #[test]
+    fn test_normalize_last_wrong_shape_returns_fail() {
+        let result = r(r#"normalizeLast(Seq[1, 2]);"#);
+        assert_eq!(
+            result,
+            serde_json::json!({"$type": "fail", "$code": "t_sda_wrong_shape", "$msg": "wrong shape"})
+        );
+    }
+
+    #[test]
+    fn test_normalize_unique_non_string_bagkv_key_returns_fail() {
+        let result = ri(
+            r#"normalizeUnique(input);"#,
+            serde_json::json!({
+                "$type": "bagkv",
+                "$items": [[1, 2]]
+            }),
+        );
+        assert_eq!(
+            result,
+            serde_json::json!({"$type": "fail", "$code": "t_sda_wrong_shape", "$msg": "wrong shape"})
+        );
     }
 
     #[test]

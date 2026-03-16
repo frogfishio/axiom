@@ -129,7 +129,15 @@ fn stdlib_normalize_unique(args: Vec<Value>) -> Result<Value, EvalError> {
         Value::BagKV(pairs) => {
             let mut map: Vec<(String, Value)> = Vec::new();
             for (k, v) in pairs {
-                let key_str = value_as_map_key(&k)?;
+                let key_str = match value_as_map_key(&k) {
+                    Ok(key) => key,
+                    Err(_) => {
+                        return Ok(Value::Fail_(
+                            "t_sda_wrong_shape".to_string(),
+                            "wrong shape".to_string(),
+                        ))
+                    }
+                };
                 if map.iter().any(|(existing_key, _)| existing_key == &key_str) {
                     return Ok(Value::Fail_(
                         "t_sda_duplicate_key".to_string(),
@@ -140,9 +148,10 @@ fn stdlib_normalize_unique(args: Vec<Value>) -> Result<Value, EvalError> {
             }
             Ok(Value::Ok_(Box::new(Value::Map(map))))
         }
-        other => Err(EvalError::TypeError(format!(
-            "normalizeUnique requires bagkv, got {other:?}"
-        ))),
+        _ => Ok(Value::Fail_(
+            "t_sda_wrong_shape".to_string(),
+            "wrong shape".to_string(),
+        )),
     }
 }
 
@@ -152,16 +161,25 @@ fn stdlib_normalize_first(args: Vec<Value>) -> Result<Value, EvalError> {
         Value::BagKV(pairs) => {
             let mut map: Vec<(String, Value)> = Vec::new();
             for (k, v) in pairs {
-                let key_str = value_as_map_key(&k)?;
+                let key_str = match value_as_map_key(&k) {
+                    Ok(key) => key,
+                    Err(_) => {
+                        return Ok(Value::Fail_(
+                            "t_sda_wrong_shape".to_string(),
+                            "wrong shape".to_string(),
+                        ))
+                    }
+                };
                 if !map.iter().any(|(existing_key, _)| existing_key == &key_str) {
                     map.push((key_str, v));
                 }
             }
             Ok(Value::Map(map))
         }
-        other => Err(EvalError::TypeError(format!(
-            "normalizeFirst requires bagkv, got {other:?}"
-        ))),
+        _ => Ok(Value::Fail_(
+            "t_sda_wrong_shape".to_string(),
+            "wrong shape".to_string(),
+        )),
     }
 }
 
@@ -171,7 +189,15 @@ fn stdlib_normalize_last(args: Vec<Value>) -> Result<Value, EvalError> {
         Value::BagKV(pairs) => {
             let mut map: Vec<(String, Value)> = Vec::new();
             for (k, v) in pairs {
-                let key_str = value_as_map_key(&k)?;
+                let key_str = match value_as_map_key(&k) {
+                    Ok(key) => key,
+                    Err(_) => {
+                        return Ok(Value::Fail_(
+                            "t_sda_wrong_shape".to_string(),
+                            "wrong shape".to_string(),
+                        ))
+                    }
+                };
                 if let Some(existing) = map.iter_mut().find(|(existing_key, _)| existing_key == &key_str) {
                     existing.1 = v;
                 } else {
@@ -180,9 +206,10 @@ fn stdlib_normalize_last(args: Vec<Value>) -> Result<Value, EvalError> {
             }
             Ok(Value::Map(map))
         }
-        other => Err(EvalError::TypeError(format!(
-            "normalizeLast requires bagkv, got {other:?}"
-        ))),
+        _ => Ok(Value::Fail_(
+            "t_sda_wrong_shape".to_string(),
+            "wrong shape".to_string(),
+        )),
     }
 }
 

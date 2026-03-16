@@ -42,6 +42,49 @@ SDA as a **standalone** language.
 
 ---
 
+## Section layering doctrine
+
+This specification distinguishes two levels:
+
+1. **Core algebra**: the mathematically closed, pure semantics of SDA.
+2. **Standalone profile / extensions**: surface syntax choices, embedding or host concerns,
+   and convenience features layered on top of the core.
+
+Rule:
+
+- Extensions may add surface area or host integration points.
+- Extensions may **not** change the meaning of the core algebra.
+- In particular, extensions may not weaken determinism, carrier semantics, normalization rules,
+  eliminator semantics, or stable failure boundaries defined by the core.
+
+Section role guide:
+
+- **Core algebra**:
+  - §1 Core data model
+  - §2 Variables, scopes, and programs
+  - §3 Carriers
+  - §4 Absence, optionality, and errors
+  - §5 Selectors
+  - §6 The Three Eliminators
+  - §7 Normalization
+  - §8 Set / Bag / Seq operators
+  - §9 Comprehensions
+  - §10 Pipe operator
+- **Mixed boundary sections**:
+  - §11 Functions
+  - §12 Error codes
+  - §14 Conformance requirements
+- **Standalone profile / extension-facing sections**:
+  - §0 lexical and notation conventions
+  - §13 Worked examples
+  - §15 Non-goals
+  - Appendix A grammar sketch
+  - Appendix B embedding examples
+
+Unless a section explicitly says otherwise, the semantic content of the core algebra is normative.
+
+---
+
 ## 0.0 Normative vs informative
 
 This specification uses two kinds of requirements:
@@ -673,16 +716,18 @@ _  ;; error: unbound placeholder
 
 ---
 
-## 11. Functions (minimal standard library)
+## 11. Functions (mixed: core combinators + standalone helpers)
 
-Standalone SDA defines a tiny required library.
+SDA keeps the irreducible algebra small. This section therefore distinguishes:
 
-### 11.1 Required functions
+1. **Core combinators**: pure functions that are part of the mathematical SDA surface.
+2. **Standalone profile helpers**: pure inspection or convenience helpers provided by the
+  standalone SDA profile.
 
-- `typeOf(x) -> Str`
-- `keys(map) -> Set`
-- `values(map) -> Seq`
-- `count(x, bag) -> Num`
+Hosts may add more helper functions, but they may not change the meaning of the core combinators.
+
+### 11.1 Core combinators
+
 - `normalizeUnique(bagkv) -> Res[Map]`
 - `normalizeFirst(bagkv) -> Map`
 - `normalizeLast(bagkv) -> Map`
@@ -695,7 +740,20 @@ Standalone SDA defines a tiny required library.
 - `bindRes(res, f) -> Res`            ;; Result monadic bind / andThen (Ok -> f(v), Fail -> Fail)
 - `orElseRes(res, other) -> Res`      ;; Result fallback
 
-### 11.2 Semantics of combinators
+### 11.2 Standalone profile helpers
+
+The standalone profile also provides a small set of pure inspection helpers:
+
+- `typeOf(x) -> Str`
+- `keys(map) -> Set`
+- `values(map) -> Seq`
+- `count(x, bag) -> Num`
+
+These helpers are part of standalone SDA, but they are not the irreducible algebraic core.
+Other hosts may omit them, rename them, or provide additional helpers, provided the core algebra
+remains unchanged.
+
+### 11.3 Semantics of core combinators
 
 These combinators are pure (no IO) and deterministic.
 
@@ -724,7 +782,14 @@ These combinators are pure (no IO) and deterministic.
 - In standalone SDA, if any binding key `k` is not a `Str`, return `Fail(t_sda_wrong_shape, "wrong shape")`.
 - Otherwise return `Ok(BagKV{ ... })` containing the same bindings in unspecified order (bag semantics).
 
-Hosts may add more.
+Standalone helper notes:
+
+- `typeOf` is observational only; it must not be used to justify hidden coercions.
+- `keys` and `values` are profile helpers over keyed carriers. Their exact standalone ordering or
+  carrier behavior, where observable, must be documented by the standalone profile.
+- `count(x, bag)` is a pure cardinality helper and does not change carrier semantics.
+
+Hosts may add more helpers or profile conveniences, but not by redefining the above core meanings.
 
 ---
 

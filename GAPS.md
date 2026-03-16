@@ -45,7 +45,7 @@ Decision note:
 - [x] Implement the remaining stable error tags listed in the SDA spec.
 - [ ] Separate runtime type errors from spec-stable `Fail(code, msg)` results more rigorously.
 - [ ] Improve parser diagnostics around selector ambiguity, invalid map keys, and unsupported comprehension forms.
-- [ ] Add conformance tests for all stable error codes and message strings.
+- [x] Add conformance tests for all stable error codes and message strings.
 
 ## CLI And Tooling
 
@@ -56,7 +56,7 @@ Decision note:
 
 ## Conformance Harness
 
-- [ ] Build a spec-indexed conformance suite layout separate from implementation unit tests.
+- [x] Build a spec-indexed conformance suite layout separate from implementation unit tests.
 - [x] Add tests for selector semantics on `Map`, `Prod`, and `BagKV` edge cases.
-- [ ] Add property-style tests for set, bag, and map algebra where determinism matters.
+- [x] Add finite-corpus law tests for set, bag, and map algebra where determinism matters.
 - [ ] Add regression coverage for every gap closed from this file.

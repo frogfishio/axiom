@@ -62,5 +62,8 @@ cargo sda-run -- '1 + 2'
 ## Ordering notes
 
 - `Map` is unordered semantically, so any API that returns a sequence from a map must define its own order.
+- `Set` and `Bag` are canonicalized on JSON output by sorting their item encodings by canonical JSON text. `Set` output also removes duplicate items if a malformed host value is constructed.
+- `BagKV` is canonicalized on JSON output by sorting pair encodings by canonical JSON text.
+- `Map` JSON output is canonicalized by ascending string key order.
 - `values(map)` is canonicalized by ascending string key order in standalone SDA.
 - `values(prod)` remains declaration order because `Prod` is a shaped record rather than an unordered map surface.
