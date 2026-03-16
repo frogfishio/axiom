@@ -23,6 +23,45 @@ pub enum EvalError {
     ArityMismatch { expected: usize, got: usize },
 }
 
+pub(crate) fn ensure_comparable(value: &Value) -> Result<(), EvalError> {
+    match value {
+        Value::Null
+        | Value::Bool(_)
+        | Value::Num(_)
+        | Value::Str(_)
+        | Value::Bytes(_)
+        | Value::None_
+        | Value::Fail_(_, _) => Ok(()),
+        Value::Seq(items) | Value::Set(items) | Value::Bag(items) => {
+            for item in items {
+                ensure_comparable(item)?;
+            }
+            Ok(())
+        }
+        Value::Map(entries) | Value::Prod(entries) => {
+            for (_, value) in entries {
+                ensure_comparable(value)?;
+            }
+            Ok(())
+        }
+        Value::BagKV(pairs) => {
+            for (key, value) in pairs {
+                ensure_comparable(key)?;
+                ensure_comparable(value)?;
+            }
+            Ok(())
+        }
+        Value::Bind(key, value) => {
+            ensure_comparable(key)?;
+            ensure_comparable(value)
+        }
+        Value::Some_(inner) | Value::Ok_(inner) => ensure_comparable(inner),
+        Value::Lambda(_, _, _) => Err(EvalError::TypeError(
+            "function values are not comparable".to_string(),
+        )),
+    }
+}
+
 pub(crate) fn values_equal(a: &Value, b: &Value) -> bool {
     a == b
 }
@@ -53,6 +92,7 @@ pub fn eval_expr(expr: &Expr, env: &Env) -> Result<Value, EvalError> {
             let mut values = Vec::new();
             for item in items {
                 let value = eval_expr(item, env)?;
+                ensure_comparable(&value)?;
                 if !values.iter().any(|existing| values_equal(existing, &value)) {
                     values.push(value);
                 }
@@ -216,6 +256,7 @@ pub fn eval_expr(expr: &Expr, env: &Env) -> Result<Value, EvalError> {
                 Carrier::Set => {
                     let mut dedup = Vec::new();
                     for value in results {
+                        ensure_comparable(&value)?;
                         if !dedup.iter().any(|existing| values_equal(existing, &value)) {
                             dedup.push(value);
                         }
@@ -258,17 +299,10 @@ fn eval_select(obj: Value, field: &str, mode: &SelectMode) -> Result<Value, Eval
                         "unknown field".to_string(),
                     )
                 })),
-                SelectMode::Optional => Ok(found
-                    .map(|v| Value::Some_(Box::new(v)))
-                    .unwrap_or(Value::None_)),
-                SelectMode::Required => Ok(found
-                    .map(|v| Value::Ok_(Box::new(v)))
-                    .unwrap_or_else(|| {
-                        Value::Fail_(
-                            "t_sda_missing_key".to_string(),
-                            "missing key".to_string(),
-                        )
-                    })),
+                SelectMode::Optional | SelectMode::Required => Ok(Value::Fail_(
+                    "t_sda_wrong_shape".to_string(),
+                    "wrong shape".to_string(),
+                )),
             }
         }
         Value::Bind(key, value) => {
@@ -369,8 +403,16 @@ fn eval_binop(op: &BinOpKind, lhs: Value, rhs: Value) -> Result<Value, EvalError
             }
             (a, b) => Err(EvalError::TypeError(format!("Cannot concat {a:?} and {b:?}"))),
         },
-        BinOpKind::Eq => Ok(Value::Bool(values_equal(&lhs, &rhs))),
-        BinOpKind::Neq => Ok(Value::Bool(!values_equal(&lhs, &rhs))),
+        BinOpKind::Eq => {
+            ensure_comparable(&lhs)?;
+            ensure_comparable(&rhs)?;
+            Ok(Value::Bool(values_equal(&lhs, &rhs)))
+        }
+        BinOpKind::Neq => {
+            ensure_comparable(&lhs)?;
+            ensure_comparable(&rhs)?;
+            Ok(Value::Bool(!values_equal(&lhs, &rhs)))
+        }
         BinOpKind::Lt => match (lhs, rhs) {
             (Value::Num(a), Value::Num(b)) => Ok(Value::Bool(a < b)),
             (Value::Str(a), Value::Str(b)) => Ok(Value::Bool(a < b)),
@@ -456,9 +498,27 @@ fn eval_binop(op: &BinOpKind, lhs: Value, rhs: Value) -> Result<Value, EvalError
             (a, b) => Err(EvalError::TypeError(format!("BDiff requires bags, got {a:?} and {b:?}"))),
         },
         BinOpKind::In => match rhs {
-            Value::Seq(items) => Ok(Value::Bool(items.iter().any(|x| values_equal(x, &lhs)))),
-            Value::Set(items) => Ok(Value::Bool(items.iter().any(|x| values_equal(x, &lhs)))),
-            Value::Bag(items) => Ok(Value::Bool(items.iter().any(|x| values_equal(x, &lhs)))),
+            Value::Seq(items) => {
+                ensure_comparable(&lhs)?;
+                for item in &items {
+                    ensure_comparable(item)?;
+                }
+                Ok(Value::Bool(items.iter().any(|x| values_equal(x, &lhs))))
+            }
+            Value::Set(items) => {
+                ensure_comparable(&lhs)?;
+                for item in &items {
+                    ensure_comparable(item)?;
+                }
+                Ok(Value::Bool(items.iter().any(|x| values_equal(x, &lhs))))
+            }
+            Value::Bag(items) => {
+                ensure_comparable(&lhs)?;
+                for item in &items {
+                    ensure_comparable(item)?;
+                }
+                Ok(Value::Bool(items.iter().any(|x| values_equal(x, &lhs))))
+            }
             Value::Map(entries) => {
                 if let Value::Str(key) = &lhs {
                     Ok(Value::Bool(entries.iter().any(|(k, _)| k == key)))

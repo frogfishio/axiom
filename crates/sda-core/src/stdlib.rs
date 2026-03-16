@@ -1,5 +1,5 @@
 use crate::number::ExactNum;
-use crate::eval::{apply_lambda, EvalError};
+use crate::eval::{apply_lambda, ensure_comparable, EvalError};
 use crate::Value;
 
 pub fn call_stdlib(name: &str, args: Vec<Value>) -> Option<Result<Value, EvalError>> {
@@ -67,24 +67,7 @@ fn stdlib_keys(args: Vec<Value>) -> Result<Value, EvalError> {
                 .map(|(k, _)| Value::Str(k.clone()))
                 .collect(),
         )),
-        Value::Prod(fields) => Ok(Value::Set(
-            fields
-                .iter()
-                .map(|(k, _)| Value::Str(k.clone()))
-                .collect(),
-        )),
-        Value::BagKV(pairs) => {
-            let mut keys = Vec::new();
-            for (key, _) in pairs {
-                if !keys.iter().any(|existing| existing == key) {
-                    keys.push(key.clone());
-                }
-            }
-            Ok(Value::Set(keys))
-        }
-        other => Err(EvalError::TypeError(format!(
-            "keys() requires map, prod, or bagkv, got {other:?}"
-        ))),
+        other => Err(EvalError::TypeError(format!("keys() requires map, got {other:?}"))),
     }
 }
 
@@ -96,12 +79,7 @@ fn stdlib_values(args: Vec<Value>) -> Result<Value, EvalError> {
             sorted.sort_by(|(left_key, _), (right_key, _)| left_key.cmp(right_key));
             Ok(Value::Seq(sorted.into_iter().map(|(_, v)| v).collect()))
         }
-        Value::Prod(fields) => Ok(Value::Seq(fields.iter().map(|(_, v)| v.clone()).collect())),
-        Value::Seq(items) => Ok(Value::Seq(items.clone())),
-        Value::Set(items) => Ok(Value::Seq(items.clone())),
-        Value::Bag(items) => Ok(Value::Seq(items.clone())),
-        Value::BagKV(pairs) => Ok(Value::Seq(pairs.iter().map(|(_, v)| v.clone()).collect())),
-        other => Err(EvalError::TypeError(format!("values() not supported for {other:?}"))),
+        other => Err(EvalError::TypeError(format!("values() requires map, got {other:?}"))),
     }
 }
 
@@ -110,13 +88,17 @@ fn stdlib_count(args: Vec<Value>) -> Result<Value, EvalError> {
     let mut iter = args.into_iter();
     let needle = iter.next().unwrap();
     let haystack = iter.next().unwrap();
+    ensure_comparable(&needle)?;
     let n = match &haystack {
-        Value::Bag(items) | Value::Seq(items) | Value::Set(items) => {
+        Value::Bag(items) => {
+            for item in items {
+                ensure_comparable(item)?;
+            }
             items.iter().filter(|v| *v == &needle).count()
         }
         other => {
             return Err(EvalError::TypeError(format!(
-                "count() requires bag/seq/set as second arg, got {other:?}"
+                "count() requires bag as second arg, got {other:?}"
             )))
         }
     };
@@ -296,7 +278,7 @@ fn stdlib_or_else_opt(args: Vec<Value>) -> Result<Value, EvalError> {
     let opt = iter.next().unwrap();
     let default = iter.next().unwrap();
     match opt {
-        Value::Some_(inner) => Ok(*inner),
+        Value::Some_(inner) => Ok(Value::Some_(inner)),
         Value::None_ => Ok(default),
         other => Err(EvalError::TypeError(format!("orElseOpt requires some/none, got {other:?}"))),
     }
@@ -335,7 +317,7 @@ fn stdlib_or_else_res(args: Vec<Value>) -> Result<Value, EvalError> {
     let res = iter.next().unwrap();
     let default = iter.next().unwrap();
     match res {
-        Value::Ok_(inner) => Ok(*inner),
+        Value::Ok_(inner) => Ok(Value::Ok_(inner)),
         Value::Fail_(_, _) => Ok(default),
         other => Err(EvalError::TypeError(format!("orElseRes requires ok/fail, got {other:?}"))),
     }

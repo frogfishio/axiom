@@ -57,6 +57,16 @@ mod section_6_eliminators {
     fn unknown_field_on_total_prod_projection() {
         assert_fail(r#"Prod{name: "Ada"}<age>;"#, "t_sda_unknown_field", "unknown field");
     }
+
+    #[test]
+    fn optional_prod_projection_is_wrong_shape() {
+        assert_fail(r#"Prod{name: "Ada"}<name>?;"#, "t_sda_wrong_shape", "wrong shape");
+    }
+
+    #[test]
+    fn required_prod_projection_is_wrong_shape() {
+        assert_fail(r#"Prod{name: "Ada"}<name>!;"#, "t_sda_wrong_shape", "wrong shape");
+    }
 }
 
 mod section_7_normalization {
@@ -295,6 +305,26 @@ mod section_10_pipe {
     #[test]
     fn unbound_placeholder_is_stable() {
         assert_fail("_;", "t_sda_unbound_placeholder", "unbound placeholder");
+    }
+}
+
+mod section_11_core_functions {
+    use super::*;
+
+    #[test]
+    fn or_else_opt_preserves_option_wrapper() {
+        assert_eq!(
+            run_json(r#"orElseOpt(Some(1), Some(2));"#),
+            serde_json::json!({"$type": "some", "$value": 1})
+        );
+    }
+
+    #[test]
+    fn or_else_res_preserves_result_wrapper() {
+        assert_eq!(
+            run_json(r#"orElseRes(Ok(1), Ok(2));"#),
+            serde_json::json!({"$type": "ok", "$value": 1})
+        );
     }
 }
 

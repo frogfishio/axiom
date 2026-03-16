@@ -946,9 +946,9 @@ mod tests {
     }
 
     #[test]
-    fn test_values_prod_preserves_declared_field_order() {
-        let result = r(r#"values(Prod{b: 2, a: 1});"#);
-        assert_eq!(result, serde_json::json!([2, 1]));
+    fn test_values_prod_is_not_a_standalone_helper_contract() {
+        let err = run(r#"values(Prod{b: 2, a: 1});"#, serde_json::Value::Null).unwrap_err();
+        assert!(err.to_string().contains("values() requires map"));
     }
 
     #[test]
@@ -1012,15 +1012,86 @@ mod tests {
     }
 
     #[test]
-    fn test_optional_selector_on_prod_behaves_like_optional_extraction() {
+    fn test_optional_selector_on_prod_is_wrong_shape() {
         let result = r(r#"Prod{name: "Alice"}<name>?;"#);
-        assert_eq!(result, serde_json::json!({"$type": "some", "$value": "Alice"}));
+        assert_eq!(
+            result,
+            serde_json::json!({"$type": "fail", "$code": "t_sda_wrong_shape", "$msg": "wrong shape"})
+        );
     }
 
     #[test]
-    fn test_required_selector_on_prod_behaves_like_required_extraction() {
+    fn test_required_selector_on_prod_is_wrong_shape() {
         let result = r(r#"Prod{name: "Alice"}<name>!;"#);
-        assert_eq!(result, serde_json::json!({"$type": "ok", "$value": "Alice"}));
+        assert_eq!(
+            result,
+            serde_json::json!({"$type": "fail", "$code": "t_sda_wrong_shape", "$msg": "wrong shape"})
+        );
+    }
+
+    #[test]
+    fn test_keys_prod_is_not_a_standalone_helper_contract() {
+        let err = run(r#"keys(Prod{b: 2, a: 1});"#, serde_json::Value::Null).unwrap_err();
+        assert!(err.to_string().contains("keys() requires map"));
+    }
+
+    #[test]
+    fn test_count_seq_is_not_a_standalone_helper_contract() {
+        let err = run(r#"count(1, Seq[1, 2, 1]);"#, serde_json::Value::Null).unwrap_err();
+        assert!(err.to_string().contains("count() requires bag as second arg"));
+    }
+
+    #[test]
+    fn test_or_else_opt_preserves_some_wrapper() {
+        assert_eq!(
+            r(r#"orElseOpt(Some(1), Some(2));"#),
+            serde_json::json!({"$type": "some", "$value": 1})
+        );
+        assert_eq!(
+            r(r#"orElseOpt(None, Some(2));"#),
+            serde_json::json!({"$type": "some", "$value": 2})
+        );
+    }
+
+    #[test]
+    fn test_or_else_res_preserves_ok_wrapper() {
+        assert_eq!(
+            r(r#"orElseRes(Ok(1), Ok(2));"#),
+            serde_json::json!({"$type": "ok", "$value": 1})
+        );
+        assert_eq!(
+            r(r#"orElseRes(Fail("x", "y"), Ok(2));"#),
+            serde_json::json!({"$type": "ok", "$value": 2})
+        );
+    }
+
+    #[test]
+    fn test_bagkv_equality_is_extensional_with_multiplicity() {
+        assert_eq!(
+            r(r#"BagKV{"a" -> 1, "b" -> 2, "a" -> 1} = BagKV{"b" -> 2, "a" -> 1, "a" -> 1};"#),
+            serde_json::Value::Bool(true)
+        );
+        assert_eq!(
+            r(r#"BagKV{"a" -> 1, "b" -> 2, "a" -> 1} = BagKV{"b" -> 2, "a" -> 1};"#),
+            serde_json::Value::Bool(false)
+        );
+    }
+
+    #[test]
+    fn test_bind_option_result_equality_is_pointwise() {
+        assert_eq!(r(r#"Bind("a", 1) = Bind("a", 1);"#), serde_json::Value::Bool(true));
+        assert_eq!(r(r#"Some(Null) = None;"#), serde_json::Value::Bool(false));
+        assert_eq!(r(r#"Ok(1) = Ok(1);"#), serde_json::Value::Bool(true));
+        assert_eq!(r(r#"Ok(1) = Fail("x", "y");"#), serde_json::Value::Bool(false));
+    }
+
+    #[test]
+    fn test_function_values_are_not_comparable() {
+        let eq_err = run(r#"let f = x => x; f = f;"#, serde_json::Value::Null).unwrap_err();
+        assert!(eq_err.to_string().contains("function values are not comparable"));
+
+        let set_err = run(r#"Set{x => x};"#, serde_json::Value::Null).unwrap_err();
+        assert!(set_err.to_string().contains("function values are not comparable"));
     }
 
     #[test]

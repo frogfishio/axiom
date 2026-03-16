@@ -98,10 +98,19 @@ Unless a section is explicitly marked **Informative**, it should be treated as *
 
 SDA is a pure, deterministic transformation language.
 
-- A program evaluates to either a **value** or a `Fail(code, msg)`.
+- The core semantics has two layers:
+  - **static validity**: whether a program uses only lawful core forms
+  - **evaluation**: the result of running a statically valid program on an input value
+- A statically valid program evaluates to either a **value** or a `Fail(code, msg)`.
 - The only observable result is the final value (including `Ok/Fail` wrappers if present).
 - There is no ambient IO. Any host interaction is via host-provided input values and host-installed functions.
 - Order is observable only for `Seq`. `Set`, `Bag`, `Map`, and `Prod` are compared extensionally (see §1.2).
+
+Core boundary rule:
+
+- A host MAY reject statically invalid SDA before evaluation.
+- A host MAY also defer some checks until evaluation if it cannot decide them earlier.
+- It MUST NOT change the underlying core condition by reinterpreting an invalid or failing form as a different operation.
 
 ## 0.2 Comments and lexing
 
@@ -149,7 +158,7 @@ values. SDA itself has no ambient IO.
 
 SDA defines the following value kinds:
 
-- **Null**: the absence of a value. (SDA prefers explicit absence; see §4.)
+- **Null**: an explicit null data value. It is not the same as absence (see §4).
 - **Bool**: `true | false`
 - **Num**: exact numeric values (host chooses representation; must preserve equality)
 - **Str**: Unicode string
@@ -168,11 +177,27 @@ host declares it as such.
 `=` compares values for equality.
 
 Requirements:
+- For `Null`, equality is by kind: `Null = Null`.
+- For `Bool`, `Num`, `Str`, and `Bytes`, equality is by value.
 - Equality must be **reflexive**, **symmetric**, **transitive**.
 - For `Set`, equality is extensional (same members).
 - For `Bag`, equality is extensional with multiplicity.
 - For `Seq`, equality is positional.
 - For `Map`, equality is extensional (same bindings).
+- For `Prod`, equality is extensional over field labels and values.
+- For `BagKV`, equality is extensional with multiplicity over bindings.
+- For `Bind(k, v)`, equality is pointwise: `Bind(k1, v1) = Bind(k2, v2)` iff `k1 = k2` and `v1 = v2`.
+- For `Some(v)`, equality is pointwise over the wrapped value.
+- `None = None`.
+- For `Ok(v)`, equality is pointwise over the wrapped value.
+- For `Fail(code, msg)`, equality is pointwise over `code` and `msg`.
+
+Function equality:
+
+- Function values are not part of the comparable data algebra.
+- Standalone SDA MUST NOT treat two function values as equal merely because they are textually identical.
+- If a function value reaches a position requiring equality (for example set membership or set construction),
+  the host must reject that usage or otherwise make it unreachable in the standalone core.
 
 When a host cannot provide a meaningful equality for a value (e.g. opaque handle),
 it must not allow that value in positions requiring equality (e.g. Set membership).
@@ -266,12 +291,23 @@ Unique-key mapping.
 
 ### 3.5 Prod (records)
 
-Prod is a product with named fields. In standalone SDA, Prod is a value kind that
-can be projected **totally** (no missing fields) when the host declares its shape.
+Prod is a product with named fields.
+
+Core algebra intent:
+
+- `Prod` is a distinct carrier kind, not merely a `Map` with extra conventions.
+- `Prod` exists so total projection can have lawful meaning.
+- The field set of a `Prod` is treated as known for the purpose of total projection.
 
 - Literal (standalone form): `Prod{ name: "steve", age: 11 }`
 
-A host may choose to represent Prod separately from Map (recommended).
+Standalone SDA treats a `Prod{ ... }` literal as introducing a known product shape locally.
+
+Hosts may also construct `Prod` values from external schemas or typed embeddings, but they must
+preserve the same core meaning: `Prod` supports total projection; `Map` does not.
+
+A host may choose to represent `Prod` separately from `Map` (recommended), but representational
+choice must not erase the semantic distinction.
 
 ---
 
@@ -353,16 +389,24 @@ Form:
 Semantics:
 
 - **Allowed only on Prod** (or host-declared schema-known product-like values).
-- If `k` is not a field of `x`, this is a **compile-time** error when shape is known.
-- If shape is not known at compile time, the host must either:
-  - reject compiling SDA requiring total projection, or
-  - treat it as runtime error `t_sda_wrong_shape`.
+- The name "total eliminator" means total on its lawful domain of product projection; it does not
+  mean lawful on every SDA value.
+- Core meaning:
+  - if `x` is a `Prod` and `k` is a field of `x`, return its value
+  - if `x` is a `Prod` and `k` is not a field of `x`, fail with `t_sda_unknown_field`
+  - if `x` is not a `Prod`, the total eliminator is not lawful on that value shape
+- Standalone and host realization:
+  - when shape is statically known, a host SHOULD reject an impossible total projection before evaluation
+  - when the host cannot reject earlier, it MUST preserve the same language boundary and not reinterpret
+    total projection as Map or BagKV access
+  - if evaluated against a non-`Prod`, the host MUST reject it or surface `t_sda_wrong_shape`
 
 Type behavior:
 
 - `Prod{name:T,...}⟨name⟩ : T`
 
-Note: The total eliminator `x⟨k⟩` is legal only on Prod (schema-known). Optional (`?`) and required (`!`) eliminators are the only ones legal on Map or BagKV.
+Note: The total eliminator `x⟨k⟩` is legal only on `Prod` (schema-known). Optional (`?`) and required (`!`) eliminators are the only ones legal on `Map` or `BagKV`.
+No extension may redefine bare `x⟨k⟩` as total projection on `Map`.
 
 ### 6.2 Optional eliminator (partial extraction)
 
@@ -421,7 +465,8 @@ The following table is normative. It defines which operations are total and whic
 
 Operation                Input kind(s)                     Output        Total  Failure codes
 ----------------------  --------------------------------  ------------  -----  -----------------------------
-x⟨k⟩                    Prod (schema-known)               value         Yes    (compile-time unknown field)
+x⟨k⟩                    Prod (schema-known)               value         No     t_sda_unknown_field,
+                                                                           t_sda_wrong_shape
 x⟨k⟩?                   Map, BagKV                        Opt[value]    Yes    t_sda_wrong_shape
 x⟨k⟩!                   Map, BagKV                        Res[value]    No     t_sda_wrong_shape,
                                                                            t_sda_missing_key,
@@ -433,8 +478,14 @@ normalizeLast(bagkv)    BagKV                             Map           Yes    t
 asBagKV(bag)            Bag                              Res[BagKV]     No     t_sda_wrong_shape
 
 Notes:
-- “Total” means the operation does not produce `Fail(...)` in a conforming implementation.
-- Compile-time shape errors (e.g. projecting a non-existent field on a schema-known `Prod`) are not represented as `Fail(...)` and are reported at compile time by the host toolchain.
+- “Total” means total on the operation's lawful input domain as defined by the core algebra.
+- The name "total eliminator" refers to unwrapped projection on lawful `Prod` inputs, not to universal
+  totality across all SDA values.
+- An implementation MAY reject statically invalid uses earlier, but it must preserve the same core
+  semantic condition if evaluation is attempted.
+- In particular, impossible total projection on a known `Prod` shape and runtime total projection
+  of a missing `Prod` field name describe the same core condition: `t_sda_unknown_field`.
+- Applying total projection to a non-`Prod` value is a `t_sda_wrong_shape` condition.
 
 ## 7. Normalization (algebra changes)
 
@@ -753,6 +804,33 @@ These helpers are part of standalone SDA, but they are not the irreducible algeb
 Other hosts may omit them, rename them, or provide additional helpers, provided the core algebra
 remains unchanged.
 
+Standalone helper contracts:
+
+- `typeOf(x) -> Str`
+  - returns the standalone SDA type tag for `x`
+  - required tags are the names of the SDA value kinds: `null`, `bool`, `num`, `str`, `bytes`,
+    `seq`, `set`, `bag`, `map`, `prod`, `bagkv`, `bind`, `some`, `none`, `ok`, `fail`, `fn`
+- `keys(map) -> Set`
+  - defined for `Map`
+  - returns the set of keys present in the map
+  - in standalone SDA with string-only map keys, the result is `Set[Str]`
+- `values(map) -> Seq`
+  - defined for `Map`
+  - returns a sequence of values ordered by ascending key order in the standalone profile
+  - this canonical order is part of standalone determinism and must not depend on parse order,
+    host object insertion order, or runtime hash iteration order
+- `count(x, bag) -> Num`
+  - defined for `Bag`
+  - returns the multiplicity of `x` in the bag
+
+Profile discipline:
+
+- These helper contracts define the standalone SDA profile only.
+- A host MAY provide additional helper overloads for other carriers, but such overloads are host
+  extensions, not part of standalone SDA.
+- In particular, hosts must not silently broaden standalone `keys(map)`, `values(map)`, or
+  `count(x, bag)` and still present that broader surface as the standalone core contract.
+
 ### 11.3 Semantics of core combinators
 
 These combinators are pure (no IO) and deterministic.
@@ -785,8 +863,7 @@ These combinators are pure (no IO) and deterministic.
 Standalone helper notes:
 
 - `typeOf` is observational only; it must not be used to justify hidden coercions.
-- `keys` and `values` are profile helpers over keyed carriers. Their exact standalone ordering or
-  carrier behavior, where observable, must be documented by the standalone profile.
+- `keys` and `values` are profile helpers over `Map` in standalone SDA.
 - `count(x, bag)` is a pure cardinality helper and does not change carrier semantics.
 
 Hosts may add more helpers or profile conveniences, but not by redefining the above core meanings.
@@ -810,6 +887,16 @@ These codes are stable and MUST be used by conforming implementations.
 `Fail(code, msg)` must include:
 - `code`: one of the stable tags above
 - `msg`: a stable short message (English) suitable for tests
+
+Boundary note:
+
+- These stable codes constrain the language boundary where SDA itself defines failure.
+- Static validity and dynamic failure are two views of the same core semantics; hosts may choose
+  earlier rejection, but may not assign different meanings to the underlying condition.
+- Parser wording, host exception types, source spans, IDE diagnostics, and other rendering details are
+  part of the standalone profile or host tooling, not the mathematical core.
+- Where this specification names a stable tag for a parse-time or compile-time condition, conformance
+  applies to the tag and semantic condition, not to any particular host-specific diagnostic format.
 
 ---
 
@@ -879,6 +966,10 @@ A conforming SDA implementation MUST:
 5. Provide both Unicode and ASCII spellings for operators listed in §0.
 6. Implement pipe semantics (§10) with correct scoping of `•` / `_` and left-associativity.
 7. Implement BagKV comprehension binding and projection semantics (§9.4).
+8. Preserve the semantic distinction between `Prod` total projection and `Map` or `BagKV` access.
+9. If claiming standalone profile conformance, implement the helper contracts in §11.2 exactly.
+10. Implement equality for every comparable core value kind exactly as defined in §1.2.
+11. Preserve the same semantic condition whether a core error is detected statically or during evaluation.
 
 ### 14.1 Minimal conformance suite outline (Informative)
 
@@ -893,6 +984,15 @@ A minimal test suite SHOULD include canonical cases for:
 - Normalization:
   - `normalizeUnique` fails on duplicates and succeeds otherwise.
   - `normalizeFirst` / `normalizeLast` are total and deterministic.
+- Equality:
+  - `Prod{a: 1, b: 2} = Prod{b: 2, a: 1}`
+  - `BagKV{"k" -> 1, "k" -> 2} = BagKV{"k" -> 2, "k" -> 1}` extensionally with multiplicity
+  - `Some(Null) != None`
+  - `Ok(1) != Fail("x", "y")`
+- Standalone helper profile:
+  - `keys(Map{"b" -> 2, "a" -> 1}) = Set{"a", "b"}` extensionally
+  - `values(Map{"b" -> 2, "a" -> 1}) = Seq[1, 2]` in ascending key order
+  - `count(1, Bag{1, 2, 1}) = 2`
 - Carrier preservation in comprehensions:
   - Source `Seq` yields `Seq`, source `Set` yields `Set`, source `Bag` yields `Bag`.
 - Null vs absence:
