@@ -33,6 +33,7 @@ pub fn eval_expr(expr: &Expr, env: &Env) -> Result<Value, EvalError> {
         Expr::Bool(b) => Ok(Value::Bool(*b)),
         Expr::Num(n) => Ok(Value::Num(n.clone())),
         Expr::Str(s) => Ok(Value::Str(s.clone())),
+        Expr::Bytes(bytes) => Ok(Value::Bytes(bytes.clone())),
         Expr::Placeholder => Ok(env.get("_").cloned().unwrap_or_else(|| {
             Value::Fail_(
                 "t_sda_unbound_placeholder".to_string(),
@@ -231,7 +232,10 @@ fn eval_select(obj: Value, field: &str, mode: &SelectMode) -> Result<Value, Eval
         Value::Map(entries) => {
             let found = entries.iter().find(|(k, _)| k == field).map(|(_, v)| v.clone());
             match mode {
-                SelectMode::Plain => Ok(found.unwrap_or(Value::Null)),
+                SelectMode::Plain => Ok(Value::Fail_(
+                    "t_sda_wrong_shape".to_string(),
+                    "wrong shape".to_string(),
+                )),
                 SelectMode::Optional => Ok(found
                     .map(|v| Value::Some_(Box::new(v)))
                     .unwrap_or(Value::None_)),
@@ -248,7 +252,12 @@ fn eval_select(obj: Value, field: &str, mode: &SelectMode) -> Result<Value, Eval
         Value::Prod(fields) => {
             let found = fields.iter().find(|(k, _)| k == field).map(|(_, v)| v.clone());
             match mode {
-                SelectMode::Plain => Ok(found.unwrap_or(Value::Null)),
+                SelectMode::Plain => Ok(found.unwrap_or_else(|| {
+                    Value::Fail_(
+                        "t_sda_unknown_field".to_string(),
+                        "unknown field".to_string(),
+                    )
+                })),
                 SelectMode::Optional => Ok(found
                     .map(|v| Value::Some_(Box::new(v)))
                     .unwrap_or(Value::None_)),
@@ -289,9 +298,10 @@ fn eval_select(obj: Value, field: &str, mode: &SelectMode) -> Result<Value, Eval
                 .filter(|(k, _)| matches!(k, Value::Str(s) if s == field))
                 .collect();
             match mode {
-                SelectMode::Plain => {
-                    Err(EvalError::TypeError("Total projection not valid on BagKV".to_string()))
-                }
+                SelectMode::Plain => Ok(Value::Fail_(
+                    "t_sda_wrong_shape".to_string(),
+                    "wrong shape".to_string(),
+                )),
                 SelectMode::Optional => match matches.len() {
                     0 => Ok(Value::None_),
                     1 => Ok(Value::Some_(Box::new(matches[0].1.clone()))),
@@ -319,7 +329,10 @@ fn eval_select(obj: Value, field: &str, mode: &SelectMode) -> Result<Value, Eval
                 "t_sda_wrong_shape".to_string(),
                 "wrong shape".to_string(),
             )),
-            SelectMode::Plain => Err(EvalError::TypeError(format!("Cannot select from {obj:?}"))),
+            SelectMode::Plain => Ok(Value::Fail_(
+                "t_sda_wrong_shape".to_string(),
+                "wrong shape".to_string(),
+            )),
         },
     }
 }

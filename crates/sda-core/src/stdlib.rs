@@ -41,6 +41,7 @@ fn stdlib_type_of(args: Vec<Value>) -> Result<Value, EvalError> {
         Value::Bool(_) => "bool",
         Value::Num(_) => "num",
         Value::Str(_) => "str",
+        Value::Bytes(_) => "bytes",
         Value::Seq(_) => "seq",
         Value::Set(_) => "set",
         Value::Bag(_) => "bag",
@@ -90,7 +91,11 @@ fn stdlib_keys(args: Vec<Value>) -> Result<Value, EvalError> {
 fn stdlib_values(args: Vec<Value>) -> Result<Value, EvalError> {
     check_arity("values", &args, 1)?;
     match &args[0] {
-        Value::Map(entries) => Ok(Value::Seq(entries.iter().map(|(_, v)| v.clone()).collect())),
+        Value::Map(entries) => {
+            let mut sorted = entries.clone();
+            sorted.sort_by(|(left_key, _), (right_key, _)| left_key.cmp(right_key));
+            Ok(Value::Seq(sorted.into_iter().map(|(_, v)| v).collect()))
+        }
         Value::Prod(fields) => Ok(Value::Seq(fields.iter().map(|(_, v)| v.clone()).collect())),
         Value::Seq(items) => Ok(Value::Seq(items.clone())),
         Value::Set(items) => Ok(Value::Seq(items.clone())),

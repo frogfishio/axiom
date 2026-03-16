@@ -3,7 +3,7 @@
 This file tracks the work needed to turn the current SDA seed runtime into the canonical implementation for this repository.
 
 Current note:
-Exact numeric semantics now use an exact rational representation. Non-terminating rationals are bridged through a canonical JSON wrapper (`{"$type":"num","$value":"p/q"}`), but the broader JSON bridge for all value kinds still needs a fuller canonicalization pass.
+The JSON bridge is now explicit: plain objects decode to `Map` unless they use a reserved SDA wrapper tag, and colliding plain maps are emitted through `{"$type":"map","$entries":{...}}` so wrapper-tag precedence stays deterministic without losing round-tripping.
 
 ## Migration
 
@@ -22,21 +22,27 @@ Exact numeric semantics now use an exact rational representation. Non-terminatin
 ## Surface Conformance
 
 - [x] Restrict standalone `Map` literal keys to string literals only.
-- [ ] Decide whether `BagKV` literal keys should remain permissive or be aligned more tightly with the standalone surface.
+- [x] Decide whether `BagKV` literal keys should remain permissive or be aligned more tightly with the standalone surface.
+
+Decision note:
+Standalone `BagKV` keys now follow the spec grammar for selector positions: `IDENT | STRING`. This stays intentionally broader than standalone `Map` keys, which remain string-literal-only.
 - [x] Expand comprehension parsing to support the full intended expression surface, not only identifier-led shorthand forms.
-- [ ] Add tests for Unicode and ASCII synonym parity across all supported operators.
-- [ ] Add tests for comment handling, whitespace insensitivity, and string escape semantics from the spec.
+- [x] Add tests for Unicode and ASCII synonym parity across all supported operators.
+- [x] Add tests for comment handling, whitespace insensitivity, and string escape semantics from the spec.
 
 ## Core Data Model
 
-- [ ] Implement the `Bytes` value kind end-to-end: syntax, runtime value, JSON or host bridge, and tests.
-- [ ] Decide and document canonical JSON bridging rules for non-JSON carriers and wrapper values.
+- [x] Implement the `Bytes` value kind end-to-end: syntax, runtime value, JSON or host bridge, and tests.
+- [x] Decide and document canonical JSON bridging rules for non-JSON carriers and wrapper values.
 - [x] Revisit `keys(map)` so it returns the carrier required by the spec.
-- [ ] Confirm `values(map)` ordering semantics and document whether they are canonical or host-derived.
+- [x] Confirm `values(map)` ordering semantics and document whether they are canonical or host-derived.
+
+Decision note:
+`values(map)` is canonical in standalone SDA: it returns a `Seq` ordered by ascending string key. This avoids leaking parse or host object insertion order from an unordered carrier. `values(prod)` remains declaration-order.
 
 ## Errors And Diagnostics
 
-- [ ] Implement the remaining stable error tags listed in the SDA spec.
+- [x] Implement the remaining stable error tags listed in the SDA spec.
 - [ ] Separate runtime type errors from spec-stable `Fail(code, msg)` results more rigorously.
 - [ ] Improve parser diagnostics around selector ambiguity, invalid map keys, and unsupported comprehension forms.
 - [ ] Add conformance tests for all stable error codes and message strings.
@@ -51,6 +57,6 @@ Exact numeric semantics now use an exact rational representation. Non-terminatin
 ## Conformance Harness
 
 - [ ] Build a spec-indexed conformance suite layout separate from implementation unit tests.
-- [ ] Add tests for selector semantics on `Map`, `Prod`, and `BagKV` edge cases.
+- [x] Add tests for selector semantics on `Map`, `Prod`, and `BagKV` edge cases.
 - [ ] Add property-style tests for set, bag, and map algebra where determinism matters.
 - [ ] Add regression coverage for every gap closed from this file.

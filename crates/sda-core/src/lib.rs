@@ -33,6 +33,7 @@ pub enum Value {
     Bool(bool),
     Num(ExactNum),
     Str(String),
+    Bytes(Vec<u8>),
     Seq(Vec<Value>),
     Set(Vec<Value>),
     Bag(Vec<Value>),
@@ -54,6 +55,7 @@ impl PartialEq for Value {
             (Value::Bool(a), Value::Bool(b)) => a == b,
             (Value::Num(a), Value::Num(b)) => a == b,
             (Value::Str(a), Value::Str(b)) => a == b,
+            (Value::Bytes(a), Value::Bytes(b)) => a == b,
             (Value::Seq(a), Value::Seq(b)) => a == b,
             (Value::Set(a), Value::Set(b)) => set_equal(a, b),
             (Value::Bag(a), Value::Bag(b)) => multiset_equal(a, b),
@@ -184,6 +186,24 @@ pub fn from_json(v: serde_json::Value) -> Value {
         serde_json::Value::Object(obj) => {
             if let Some(serde_json::Value::String(ty)) = obj.get("$type") {
                 match ty.as_str() {
+                    "bytes" => {
+                        if let Some(serde_json::Value::String(base16)) = obj.get("$base16") {
+                            return Value::Bytes(
+                                decode_base16(base16)
+                                    .expect("canonical bytes wrapper should contain valid base16"),
+                            );
+                        }
+                    }
+                    "map" => {
+                        if let Some(serde_json::Value::Object(entries)) = obj.get("$entries") {
+                            return Value::Map(
+                                entries
+                                    .iter()
+                                    .map(|(k, v)| (k.clone(), from_json(v.clone())))
+                                    .collect(),
+                            );
+                        }
+                    }
                     "num" => {
                         if let Some(serde_json::Value::String(value)) = obj.get("$value") {
                             return Value::Num(
@@ -276,6 +296,10 @@ pub fn to_json(v: Value) -> serde_json::Value {
         Value::Bool(b) => serde_json::Value::Bool(b),
         Value::Num(n) => n.to_json_value(),
         Value::Str(s) => serde_json::Value::String(s),
+        Value::Bytes(bytes) => serde_json::json!({
+            "$type": "bytes",
+            "$base16": encode_base16(&bytes)
+        }),
         Value::Seq(items) => serde_json::Value::Array(items.into_iter().map(to_json).collect()),
         Value::Set(items) => serde_json::json!({
             "$type": "set",
@@ -286,11 +310,22 @@ pub fn to_json(v: Value) -> serde_json::Value {
             "$items": items.into_iter().map(to_json).collect::<Vec<_>>()
         }),
         Value::Map(entries) => {
-            let mut map = serde_json::Map::new();
-            for (k, v) in entries {
-                map.insert(k, to_json(v));
+            let mapped_entries: Vec<(String, serde_json::Value)> =
+                entries.into_iter().map(|(k, v)| (k, to_json(v))).collect();
+            if should_wrap_map(&mapped_entries) {
+                let entries_obj: serde_json::Map<String, serde_json::Value> =
+                    mapped_entries.into_iter().collect();
+                serde_json::json!({
+                    "$type": "map",
+                    "$entries": entries_obj
+                })
+            } else {
+                let mut map = serde_json::Map::new();
+                for (k, v) in mapped_entries {
+                    map.insert(k, v);
+                }
+                serde_json::Value::Object(map)
             }
-            serde_json::Value::Object(map)
         }
         Value::Prod(fields) => {
             let mut map = serde_json::Map::new();
@@ -333,6 +368,36 @@ pub fn to_json(v: Value) -> serde_json::Value {
     }
 }
 
+fn should_wrap_map(entries: &[(String, serde_json::Value)]) -> bool {
+    let Some((_, type_value)) = entries.iter().find(|(key, _)| key == "$type") else {
+        return false;
+    };
+
+    match type_value {
+        serde_json::Value::String(tag) => reserved_json_tag(tag),
+        _ => false,
+    }
+}
+
+fn reserved_json_tag(tag: &str) -> bool {
+    matches!(
+        tag,
+        "map"
+            | "num"
+            | "bytes"
+            | "set"
+            | "bag"
+            | "prod"
+            | "bagkv"
+            | "bind"
+            | "some"
+            | "none"
+            | "ok"
+            | "fail"
+            | "fn"
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -347,6 +412,28 @@ mod tests {
 
     fn rib(expr: &str, binding_name: &str, input: serde_json::Value) -> serde_json::Value {
         run_with_input_binding(expr, binding_name, input).expect("run failed")
+    }
+
+    fn assert_same(expr_a: &str, expr_b: &str) {
+        assert_eq!(r(expr_a), r(expr_b));
+    }
+
+    fn assert_same_input(expr_a: &str, expr_b: &str, input: serde_json::Value) {
+        assert_eq!(ri(expr_a, input.clone()), ri(expr_b, input));
+    }
+
+    fn assert_json_round_trip(value: Value, expected_json: serde_json::Value) {
+        let encoded = to_json(value.clone());
+        assert_eq!(encoded, expected_json);
+        assert_eq!(from_json(encoded), value);
+    }
+
+    fn num(src: &str) -> Value {
+        Value::Num(ExactNum::parse_literal(src).expect("valid exact number literal"))
+    }
+
+    fn bytes(src: &str) -> Value {
+        Value::Bytes(decode_base16(src).expect("valid base16 bytes literal"))
     }
 
     #[test]
@@ -407,8 +494,8 @@ mod tests {
 
     #[test]
     fn test_custom_input_binding_name() {
-        let result = rib(r#"root<"name">;"#, "root", serde_json::json!({"name": "Ada"}));
-        assert_eq!(result, serde_json::json!("Ada"));
+        let result = rib(r#"root<"name">!;"#, "root", serde_json::json!({"name": "Ada"}));
+        assert_eq!(result, serde_json::json!({"$type": "ok", "$value": "Ada"}));
     }
 
     #[test]
@@ -437,6 +524,128 @@ mod tests {
     fn test_map_literal() {
         let result = r(r#"map{"a" -> 1, "b" -> 2};"#);
         assert_eq!(result, serde_json::json!({"a": 1, "b": 2}));
+    }
+
+    #[test]
+    fn test_bytes_literal_and_equality() {
+        assert_eq!(
+            r(r#"Bytes("00ff");"#),
+            serde_json::json!({"$type": "bytes", "$base16": "00ff"})
+        );
+        assert_eq!(r(r#"Bytes("00ff") = Bytes("00FF");"#), serde_json::json!(true));
+    }
+
+    #[test]
+    fn test_bytes_literal_rejects_invalid_hex() {
+        let err = run(r#"Bytes("0fg");"#, serde_json::Value::Null).unwrap_err();
+        assert!(matches!(err, SdaError::Parse(ParseError::InvalidBytesLiteral { .. })));
+    }
+
+    #[test]
+    fn test_plain_map_json_bridge_stays_plain_object() {
+        assert_json_round_trip(
+            Value::Map(vec![
+                ("a".to_string(), num("1")),
+                ("b".to_string(), Value::Str("x".to_string())),
+            ]),
+            serde_json::json!({"a": 1, "b": "x"}),
+        );
+    }
+
+    #[test]
+    fn test_reserved_tag_map_uses_explicit_map_wrapper() {
+        assert_json_round_trip(
+            Value::Map(vec![
+                ("$type".to_string(), Value::Str("set".to_string())),
+                (
+                    "$items".to_string(),
+                    Value::Seq(vec![num("1"), num("2")]),
+                ),
+            ]),
+            serde_json::json!({
+                "$type": "map",
+                "$entries": {
+                    "$type": "set",
+                    "$items": [1, 2]
+                }
+            }),
+        );
+    }
+
+    #[test]
+    fn test_unknown_tag_object_remains_plain_map() {
+        let value = from_json(serde_json::json!({
+            "$type": "custom",
+            "x": 1
+        }));
+        assert_eq!(
+            value,
+            Value::Map(vec![
+                ("$type".to_string(), Value::Str("custom".to_string())),
+                ("x".to_string(), num("1")),
+            ])
+        );
+    }
+
+    #[test]
+    fn test_reserved_bytes_tag_map_uses_explicit_map_wrapper() {
+        assert_json_round_trip(
+            Value::Map(vec![
+                ("$type".to_string(), Value::Str("bytes".to_string())),
+                ("$base16".to_string(), Value::Str("not-a-wrapper".to_string())),
+            ]),
+            serde_json::json!({
+                "$type": "map",
+                "$entries": {
+                    "$type": "bytes",
+                    "$base16": "not-a-wrapper"
+                }
+            }),
+        );
+    }
+
+    #[test]
+    fn test_wrapper_json_bridge_round_trips() {
+        assert_json_round_trip(
+            bytes("00ff"),
+            serde_json::json!({"$type": "bytes", "$base16": "00ff"}),
+        );
+        assert_json_round_trip(
+            Value::Set(vec![Value::Str("a".to_string()), Value::Str("b".to_string())]),
+            serde_json::json!({"$type": "set", "$items": ["a", "b"]}),
+        );
+        assert_json_round_trip(
+            Value::Bag(vec![num("1"), num("1")]),
+            serde_json::json!({"$type": "bag", "$items": [1, 1]}),
+        );
+        assert_json_round_trip(
+            Value::Prod(vec![("name".to_string(), Value::Str("Ada".to_string()))]),
+            serde_json::json!({"$type": "prod", "$fields": {"name": "Ada"}}),
+        );
+        assert_json_round_trip(
+            Value::BagKV(vec![(Value::Str("k".to_string()), num("2"))]),
+            serde_json::json!({"$type": "bagkv", "$items": [["k", 2]]}),
+        );
+        assert_json_round_trip(
+            Value::Bind(
+                Box::new(Value::Str("k".to_string())),
+                Box::new(num("2")),
+            ),
+            serde_json::json!({"$type": "bind", "$key": "k", "$val": 2}),
+        );
+        assert_json_round_trip(
+            Value::Some_(Box::new(Value::Str("x".to_string()))),
+            serde_json::json!({"$type": "some", "$value": "x"}),
+        );
+        assert_json_round_trip(Value::None_, serde_json::json!({"$type": "none"}));
+        assert_json_round_trip(
+            Value::Ok_(Box::new(Value::Bool(true))),
+            serde_json::json!({"$type": "ok", "$value": true}),
+        );
+        assert_json_round_trip(
+            Value::Fail_("code".to_string(), "msg".to_string()),
+            serde_json::json!({"$type": "fail", "$code": "code", "$msg": "msg"}),
+        );
     }
 
     #[test]
@@ -509,6 +718,73 @@ mod tests {
         assert_eq!(r(r#"typeOf(null);"#), serde_json::json!("null"));
         assert_eq!(r(r#"typeOf(42);"#), serde_json::json!("num"));
         assert_eq!(r(r#"typeOf("hello");"#), serde_json::json!("str"));
+        assert_eq!(r(r#"typeOf(Bytes("00ff"));"#), serde_json::json!("bytes"));
+    }
+
+    #[test]
+    fn test_unicode_ascii_parity_membership_and_logic() {
+        assert_same("2 in Set{1, 2, 3};", "2 ∈ Set{1, 2, 3};");
+        assert_same("true and false;", "true ∧ false;");
+        assert_same("true or false;", "true ∨ false;");
+        assert_same("not false;", "¬false;");
+    }
+
+    #[test]
+    fn test_unicode_ascii_parity_comparisons() {
+        assert_same("1 != 2;", "1 ≠ 2;");
+        assert_same("1 <= 2;", "1 ≤ 2;");
+        assert_same("2 >= 1;", "2 ≥ 1;");
+    }
+
+    #[test]
+    fn test_unicode_ascii_parity_lambda_and_placeholder() {
+        assert_same("let f = x => x + 1; f(5);", "let f = x ↦ x + 1; f(5);");
+        assert_same("5 |> _ + 1;", "5 |> • + 1;");
+    }
+
+    #[test]
+    fn test_unicode_ascii_parity_selector_and_comprehension_bar() {
+        assert_same_input(
+            r#"input<"name">!;"#,
+            r#"input⟨"name"⟩!;"#,
+            serde_json::json!({"name": "Ada"}),
+        );
+        assert_same(
+            r#"{ x | x in Seq[1, 2, 3] | x >= 2 };"#,
+            r#"{ x ∣ x ∈ Seq[1, 2, 3] ∣ x ≥ 2 };"#,
+        );
+    }
+
+    #[test]
+    fn test_unicode_ascii_parity_binding_and_bag_operators() {
+        assert_same(r#"Map{"a" -> 1};"#, r#"Map{"a" → 1};"#);
+        assert_same(r#"BagKV{"a" -> 1};"#, r#"BagKV{"a" → 1};"#);
+        assert_same("Bag{1, 2} bunion Bag{2, 3};", "Bag{1, 2} ⊎ Bag{2, 3};");
+        assert_same("Bag{1, 2, 2} bdiff Bag{2};", "Bag{1, 2, 2} ⊖ Bag{2};");
+    }
+
+    #[test]
+    fn test_line_comments_are_ignored() {
+        assert_eq!(r("1 + ;; comment\n 2;"), serde_json::json!(3));
+        assert_eq!(r("Seq[1, ;; keep going\n 2, 3];"), serde_json::json!([1, 2, 3]));
+    }
+
+    #[test]
+    fn test_whitespace_is_insensitive() {
+        assert_eq!(
+            r(" \n\t let   x = 1 ; \n\t x   +   2 ; \n"),
+            serde_json::json!(3)
+        );
+        assert_eq!(
+            ri(" \n input < \"name\" > ! ; \n", serde_json::json!({"name": "Ada"})),
+            serde_json::json!({"$type": "ok", "$value": "Ada"})
+        );
+    }
+
+    #[test]
+    fn test_required_string_escapes() {
+        assert_eq!(r(r#""line\nindent\tquote\"slash\\";"#), serde_json::json!("line\nindent\tquote\"slash\\"));
+        assert_eq!(r(r#"";; not a comment";"#), serde_json::json!(";; not a comment"));
     }
 
     #[test]
@@ -524,9 +800,108 @@ mod tests {
     }
 
     #[test]
+    fn test_values_map_uses_canonical_key_order() {
+        let result = r(r#"values(Map{"b" -> 2, "a" -> 1, "c" -> 3});"#);
+        assert_eq!(result, serde_json::json!([1, 2, 3]));
+    }
+
+    #[test]
+    fn test_values_map_from_json_input_uses_canonical_key_order() {
+        let result = ri(r#"values(input);"#, serde_json::json!({"z": 3, "a": 1, "m": 2}));
+        assert_eq!(result, serde_json::json!([1, 2, 3]));
+    }
+
+    #[test]
+    fn test_values_prod_preserves_declared_field_order() {
+        let result = r(r#"values(Prod{b: 2, a: 1});"#);
+        assert_eq!(result, serde_json::json!([2, 1]));
+    }
+
+    #[test]
     fn test_select() {
         let result = ri(r#"input<"name">;"#, serde_json::json!({"name": "Alice"}));
+        assert_eq!(
+            result,
+            serde_json::json!({"$type": "fail", "$code": "t_sda_wrong_shape", "$msg": "wrong shape"})
+        );
+    }
+
+    #[test]
+    fn test_total_selector_on_prod_is_allowed() {
+        let result = r(r#"Prod{name: "Alice"}<name>;"#);
         assert_eq!(result, serde_json::json!("Alice"));
+    }
+
+    #[test]
+    fn test_total_selector_on_prod_missing_field_returns_unknown_field() {
+        let result = r(r#"Prod{name: "Alice"}<age>;"#);
+        assert_eq!(
+            result,
+            serde_json::json!({"$type": "fail", "$code": "t_sda_unknown_field", "$msg": "unknown field"})
+        );
+    }
+
+    #[test]
+    fn test_total_selector_on_map_is_wrong_shape() {
+        let result = ri(r#"input<"name">;"#, serde_json::json!({"name": "Alice"}));
+        assert_eq!(
+            result,
+            serde_json::json!({"$type": "fail", "$code": "t_sda_wrong_shape", "$msg": "wrong shape"})
+        );
+    }
+
+    #[test]
+    fn test_total_selector_on_bagkv_is_wrong_shape() {
+        let result = r(r#"BagKV{"k" -> 1}<"k">;"#);
+        assert_eq!(
+            result,
+            serde_json::json!({"$type": "fail", "$code": "t_sda_wrong_shape", "$msg": "wrong shape"})
+        );
+    }
+
+    #[test]
+    fn test_optional_selector_on_non_keyed_bag_is_wrong_shape() {
+        let result = r(r#"Bag{1, 2}<"k">?;"#);
+        assert_eq!(
+            result,
+            serde_json::json!({"$type": "fail", "$code": "t_sda_wrong_shape", "$msg": "wrong shape"})
+        );
+    }
+
+    #[test]
+    fn test_required_selector_on_non_keyed_bag_is_wrong_shape() {
+        let result = r(r#"Bag{1, 2}<"k">!;"#);
+        assert_eq!(
+            result,
+            serde_json::json!({"$type": "fail", "$code": "t_sda_wrong_shape", "$msg": "wrong shape"})
+        );
+    }
+
+    #[test]
+    fn test_optional_selector_on_prod_behaves_like_optional_extraction() {
+        let result = r(r#"Prod{name: "Alice"}<name>?;"#);
+        assert_eq!(result, serde_json::json!({"$type": "some", "$value": "Alice"}));
+    }
+
+    #[test]
+    fn test_required_selector_on_prod_behaves_like_required_extraction() {
+        let result = r(r#"Prod{name: "Alice"}<name>!;"#);
+        assert_eq!(result, serde_json::json!({"$type": "ok", "$value": "Alice"}));
+    }
+
+    #[test]
+    fn test_bagkv_optional_missing_returns_none() {
+        let result = r(r#"BagKV{"k" -> 1}<"missing">?;"#);
+        assert_eq!(result, serde_json::json!({"$type": "none"}));
+    }
+
+    #[test]
+    fn test_bagkv_required_missing_returns_fail() {
+        let result = r(r#"BagKV{"k" -> 1}<"missing">!;"#);
+        assert_eq!(
+            result,
+            serde_json::json!({"$type": "fail", "$code": "t_sda_missing_key", "$msg": "missing key"})
+        );
     }
 
     #[test]
@@ -702,6 +1077,38 @@ mod tests {
     }
 
     #[test]
+    fn test_bagkv_accepts_identifier_keys_as_selector_shorthand() {
+        let result = r(r#"BagKV{content_type -> 1};"#);
+        assert_eq!(
+            result,
+            serde_json::json!({
+                "$type": "bagkv",
+                "$items": [
+                    ["content_type", 1]
+                ]
+            })
+        );
+    }
+
+    #[test]
+    fn test_bagkv_rejects_non_selector_keys() {
+        let err = run("BagKV{1 -> 2};", serde_json::Value::Null).unwrap_err();
+        assert!(matches!(err, SdaError::Parse(_)));
+    }
+
+    #[test]
+    fn test_static_selector_literal_is_rejected() {
+        let err = run("{a b};", serde_json::Value::Null).unwrap_err();
+        assert!(matches!(err, SdaError::Parse(ParseError::SelectorNotStatic)));
+    }
+
+    #[test]
+    fn test_static_selector_duplicate_label_is_rejected() {
+        let err = run("{a a};", serde_json::Value::Null).unwrap_err();
+        assert!(matches!(err, SdaError::Parse(ParseError::DuplicateLabelInSelector)));
+    }
+
+    #[test]
     fn test_unbound_placeholder_outside_pipe() {
         use crate::eval::eval_program;
         let tokens = lexer::lex("•;").unwrap();
@@ -744,4 +1151,33 @@ mod tests {
             serde_json::json!({"$type": "fail", "$code": "t_sda_wrong_shape", "$msg": "wrong shape"})
         );
     }
+}
+
+fn encode_base16(bytes: &[u8]) -> String {
+    let mut out = String::with_capacity(bytes.len() * 2);
+    for byte in bytes {
+        use std::fmt::Write as _;
+        write!(&mut out, "{byte:02x}").expect("write to string");
+    }
+    out
+}
+
+fn decode_base16(src: &str) -> Result<Vec<u8>, String> {
+    if src.len() % 2 != 0 {
+        return Err("expected even-length base16 string".to_string());
+    }
+
+    let mut out = Vec::with_capacity(src.len() / 2);
+    let mut chars = src.chars();
+    while let (Some(hi), Some(lo)) = (chars.next(), chars.next()) {
+        let hi = hi
+            .to_digit(16)
+            .ok_or_else(|| "expected base16 digits only".to_string())?;
+        let lo = lo
+            .to_digit(16)
+            .ok_or_else(|| "expected base16 digits only".to_string())?;
+        out.push(((hi << 4) | lo) as u8);
+    }
+
+    Ok(out)
 }

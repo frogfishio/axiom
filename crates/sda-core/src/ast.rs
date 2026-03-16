@@ -6,6 +6,7 @@ pub enum Expr {
     Bool(bool),
     Num(ExactNum),
     Str(String),
+    Bytes(Vec<u8>),
     Ident(String),
     Placeholder,
     Seq(Vec<Expr>),

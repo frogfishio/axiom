@@ -8,6 +8,12 @@ pub enum ParseError {
     Unexpected(TokenKind, usize),
     #[error("Expected {0} but got {1:?} at position {2}")]
     Expected(String, TokenKind, usize),
+    #[error("t_sda_selector_not_static: selector not static")]
+    SelectorNotStatic,
+    #[error("t_sda_duplicate_label_in_selector: duplicate label")]
+    DuplicateLabelInSelector,
+    #[error("Invalid bytes literal '{literal}' at position {pos}: {reason}")]
+    InvalidBytesLiteral { literal: String, pos: usize, reason: String },
     #[error("Unexpected end of input")]
     UnexpectedEof,
 }
@@ -342,6 +348,28 @@ impl Parser {
                 self.advance();
                 Ok(Expr::Str(s))
             }
+            TokenKind::Bytes => {
+                let pos = self.peek_pos();
+                self.advance();
+                self.expect(TokenKind::LParen)?;
+                let literal = match self.peek().clone() {
+                    TokenKind::Str(s) => {
+                        self.advance();
+                        s
+                    }
+                    token => {
+                        let pos = self.peek_pos();
+                        return Err(ParseError::Expected("string literal".to_string(), token, pos));
+                    }
+                };
+                self.expect(TokenKind::RParen)?;
+                let bytes = parse_bytes_literal(&literal).map_err(|reason| ParseError::InvalidBytesLiteral {
+                    literal,
+                    pos,
+                    reason,
+                })?;
+                Ok(Expr::Bytes(bytes))
+            }
             TokenKind::Placeholder => {
                 self.advance();
                 Ok(Expr::Placeholder)
@@ -461,6 +489,9 @@ impl Parser {
             }
             TokenKind::LBrace => {
                 self.advance();
+                if let Some(err) = self.detect_static_selector_error() {
+                    return Err(err);
+                }
                 self.parse_comprehension()
             }
             token => {
@@ -604,9 +635,55 @@ impl Parser {
         let value = self.parse_expr()?;
         Ok((name, value))
     }
+
+    fn detect_static_selector_error(&self) -> Option<ParseError> {
+        let mut labels = Vec::new();
+        let mut idx = self.pos;
+        while idx < self.tokens.len() {
+            match &self.tokens[idx].kind {
+                TokenKind::Ident(name) => labels.push(name.clone()),
+                TokenKind::Str(s) => labels.push(s.clone()),
+                TokenKind::RBrace => break,
+                _ => return None,
+            }
+            idx += 1;
+        }
+
+        if idx >= self.tokens.len() || self.tokens[idx].kind != TokenKind::RBrace || labels.is_empty() {
+            return None;
+        }
+
+        let mut seen = std::collections::BTreeSet::new();
+        for label in labels {
+            if !seen.insert(label) {
+                return Some(ParseError::DuplicateLabelInSelector);
+            }
+        }
+
+        Some(ParseError::SelectorNotStatic)
+    }
 }
 
 pub fn parse(tokens: Vec<Token>) -> Result<Program, ParseError> {
     let mut parser = Parser::new(tokens);
     parser.parse_program()
+}
+
+fn parse_bytes_literal(src: &str) -> Result<Vec<u8>, String> {
+    if src.len() % 2 != 0 {
+        return Err("expected even-length base16 string".to_string());
+    }
+
+    let mut out = Vec::with_capacity(src.len() / 2);
+    let mut chars = src.chars();
+    while let (Some(hi), Some(lo)) = (chars.next(), chars.next()) {
+        let hi = hi
+            .to_digit(16)
+            .ok_or_else(|| "expected base16 digits only".to_string())?;
+        let lo = lo
+            .to_digit(16)
+            .ok_or_else(|| "expected base16 digits only".to_string())?;
+        out.push(((hi << 4) | lo) as u8);
+    }
+    Ok(out)
 }
