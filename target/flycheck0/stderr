@@ -1,1 +1,411 @@
-    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.02s
+   0.017785708s  INFO prepare_target{force=false package_id=axiom-cli v1.0.1 (/Users/rumpelstiltskin/Code/Frogfish/axiom/crates/axiom-cli) target="axiom-cli"}: cargo::core::compiler::fingerprint: fingerprint error for axiom-cli v1.0.1 (/Users/rumpelstiltskin/Code/Frogfish/axiom/crates/axiom-cli)/Check { test: false }/TargetInner { name: "axiom-cli", doc: true, ..: with_path("/Users/rumpelstiltskin/Code/Frogfish/axiom/crates/axiom-cli/src/main.rs", Edition2024) }
+   0.017800541s  INFO prepare_target{force=false package_id=axiom-cli v1.0.1 (/Users/rumpelstiltskin/Code/Frogfish/axiom/crates/axiom-cli) target="axiom-cli"}: cargo::core::compiler::fingerprint:     err: failed to read `/Users/rumpelstiltskin/Code/Frogfish/axiom/target/debug/.fingerprint/axiom-cli-1975979ab20f295e/bin-axiom-cli`
+
+Caused by:
+    No such file or directory (os error 2)
+
+Stack backtrace:
+   0: std::backtrace::Backtrace::create
+   1: std::backtrace::Backtrace::capture
+   2: cargo_util::paths::read_bytes
+   3: cargo_util::paths::read
+   4: cargo::core::compiler::fingerprint::_compare_old_fingerprint
+   5: cargo::core::compiler::fingerprint::prepare_target
+   6: cargo::core::compiler::compile
+   7: <cargo::core::compiler::build_runner::BuildRunner>::compile
+   8: cargo::ops::cargo_compile::compile_ws
+   9: cargo::ops::cargo_compile::compile_with_exec
+  10: cargo::ops::cargo_compile::compile
+  11: cargo::commands::check::exec
+  12: <cargo::cli::Exec>::exec
+  13: cargo::main
+  14: std::sys::backtrace::__rust_begin_short_backtrace::<fn(), ()>
+  15: std::rt::lang_start::<()>::{closure#0}
+  16: std::rt::lang_start_internal
+  17: _main
+   0.031212791s  INFO prepare_target{force=false package_id=sda-lib v1.0.1 (/Users/rumpelstiltskin/Code/Frogfish/axiom/crates/sda-core) target="sda_lib"}: cargo::core::compiler::fingerprint: fingerprint error for sda-lib v1.0.1 (/Users/rumpelstiltskin/Code/Frogfish/axiom/crates/sda-core)/Check { test: false }/TargetInner { name_inferred: true, ..: lib_target("sda_lib", ["lib"], "/Users/rumpelstiltskin/Code/Frogfish/axiom/crates/sda-core/src/lib.rs", Edition2024) }
+   0.031229833s  INFO prepare_target{force=false package_id=sda-lib v1.0.1 (/Users/rumpelstiltskin/Code/Frogfish/axiom/crates/sda-core) target="sda_lib"}: cargo::core::compiler::fingerprint:     err: failed to read `/Users/rumpelstiltskin/Code/Frogfish/axiom/target/debug/.fingerprint/sda-lib-8b031be702bc4817/lib-sda_lib`
+
+Caused by:
+    No such file or directory (os error 2)
+
+Stack backtrace:
+   0: std::backtrace::Backtrace::create
+   1: std::backtrace::Backtrace::capture
+   2: cargo_util::paths::read_bytes
+   3: cargo_util::paths::read
+   4: cargo::core::compiler::fingerprint::_compare_old_fingerprint
+   5: cargo::core::compiler::fingerprint::prepare_target
+   6: cargo::core::compiler::compile
+   7: cargo::core::compiler::compile
+   8: <cargo::core::compiler::build_runner::BuildRunner>::compile
+   9: cargo::ops::cargo_compile::compile_ws
+  10: cargo::ops::cargo_compile::compile_with_exec
+  11: cargo::ops::cargo_compile::compile
+  12: cargo::commands::check::exec
+  13: <cargo::cli::Exec>::exec
+  14: cargo::main
+  15: std::sys::backtrace::__rust_begin_short_backtrace::<fn(), ()>
+  16: std::rt::lang_start::<()>::{closure#0}
+  17: std::rt::lang_start_internal
+  18: _main
+   0.034480291s  INFO prepare_target{force=false package_id=axiom-cli v1.0.1 (/Users/rumpelstiltskin/Code/Frogfish/axiom/crates/axiom-cli) target="axiom-cli"}: cargo::core::compiler::fingerprint: fingerprint error for axiom-cli v1.0.1 (/Users/rumpelstiltskin/Code/Frogfish/axiom/crates/axiom-cli)/Check { test: true }/TargetInner { name: "axiom-cli", doc: true, ..: with_path("/Users/rumpelstiltskin/Code/Frogfish/axiom/crates/axiom-cli/src/main.rs", Edition2024) }
+   0.034484666s  INFO prepare_target{force=false package_id=axiom-cli v1.0.1 (/Users/rumpelstiltskin/Code/Frogfish/axiom/crates/axiom-cli) target="axiom-cli"}: cargo::core::compiler::fingerprint:     err: failed to read `/Users/rumpelstiltskin/Code/Frogfish/axiom/target/debug/.fingerprint/axiom-cli-8b3bccf89182bf67/test-bin-axiom-cli`
+
+Caused by:
+    No such file or directory (os error 2)
+
+Stack backtrace:
+   0: std::backtrace::Backtrace::create
+   1: std::backtrace::Backtrace::capture
+   2: cargo_util::paths::read_bytes
+   3: cargo_util::paths::read
+   4: cargo::core::compiler::fingerprint::_compare_old_fingerprint
+   5: cargo::core::compiler::fingerprint::prepare_target
+   6: cargo::core::compiler::compile
+   7: <cargo::core::compiler::build_runner::BuildRunner>::compile
+   8: cargo::ops::cargo_compile::compile_ws
+   9: cargo::ops::cargo_compile::compile_with_exec
+  10: cargo::ops::cargo_compile::compile
+  11: cargo::commands::check::exec
+  12: <cargo::cli::Exec>::exec
+  13: cargo::main
+  14: std::sys::backtrace::__rust_begin_short_backtrace::<fn(), ()>
+  15: std::rt::lang_start::<()>::{closure#0}
+  16: std::rt::lang_start_internal
+  17: _main
+   0.034650041s  INFO prepare_target{force=false package_id=enr-cli v1.0.1 (/Users/rumpelstiltskin/Code/Frogfish/axiom/crates/enr-cli) target="enr-cli"}: cargo::core::compiler::fingerprint: fingerprint error for enr-cli v1.0.1 (/Users/rumpelstiltskin/Code/Frogfish/axiom/crates/enr-cli)/Check { test: false }/TargetInner { name: "enr-cli", doc: true, ..: with_path("/Users/rumpelstiltskin/Code/Frogfish/axiom/crates/enr-cli/src/main.rs", Edition2024) }
+   0.034653291s  INFO prepare_target{force=false package_id=enr-cli v1.0.1 (/Users/rumpelstiltskin/Code/Frogfish/axiom/crates/enr-cli) target="enr-cli"}: cargo::core::compiler::fingerprint:     err: failed to read `/Users/rumpelstiltskin/Code/Frogfish/axiom/target/debug/.fingerprint/enr-cli-2613633ea0e3d2c3/bin-enr-cli`
+
+Caused by:
+    No such file or directory (os error 2)
+
+Stack backtrace:
+   0: std::backtrace::Backtrace::create
+   1: std::backtrace::Backtrace::capture
+   2: cargo_util::paths::read_bytes
+   3: cargo_util::paths::read
+   4: cargo::core::compiler::fingerprint::_compare_old_fingerprint
+   5: cargo::core::compiler::fingerprint::prepare_target
+   6: cargo::core::compiler::compile
+   7: <cargo::core::compiler::build_runner::BuildRunner>::compile
+   8: cargo::ops::cargo_compile::compile_ws
+   9: cargo::ops::cargo_compile::compile_with_exec
+  10: cargo::ops::cargo_compile::compile
+  11: cargo::commands::check::exec
+  12: <cargo::cli::Exec>::exec
+  13: cargo::main
+  14: std::sys::backtrace::__rust_begin_short_backtrace::<fn(), ()>
+  15: std::rt::lang_start::<()>::{closure#0}
+  16: std::rt::lang_start_internal
+  17: _main
+   0.034757583s  INFO prepare_target{force=false package_id=enr-core v1.0.1 (/Users/rumpelstiltskin/Code/Frogfish/axiom/crates/enr-core) target="enr_core"}: cargo::core::compiler::fingerprint: fingerprint error for enr-core v1.0.1 (/Users/rumpelstiltskin/Code/Frogfish/axiom/crates/enr-core)/Check { test: false }/TargetInner { name_inferred: true, ..: lib_target("enr_core", ["lib"], "/Users/rumpelstiltskin/Code/Frogfish/axiom/crates/enr-core/src/lib.rs", Edition2024) }
+   0.034761166s  INFO prepare_target{force=false package_id=enr-core v1.0.1 (/Users/rumpelstiltskin/Code/Frogfish/axiom/crates/enr-core) target="enr_core"}: cargo::core::compiler::fingerprint:     err: failed to read `/Users/rumpelstiltskin/Code/Frogfish/axiom/target/debug/.fingerprint/enr-core-006e628d09f09d84/lib-enr_core`
+
+Caused by:
+    No such file or directory (os error 2)
+
+Stack backtrace:
+   0: std::backtrace::Backtrace::create
+   1: std::backtrace::Backtrace::capture
+   2: cargo_util::paths::read_bytes
+   3: cargo_util::paths::read
+   4: cargo::core::compiler::fingerprint::_compare_old_fingerprint
+   5: cargo::core::compiler::fingerprint::prepare_target
+   6: cargo::core::compiler::compile
+   7: cargo::core::compiler::compile
+   8: <cargo::core::compiler::build_runner::BuildRunner>::compile
+   9: cargo::ops::cargo_compile::compile_ws
+  10: cargo::ops::cargo_compile::compile_with_exec
+  11: cargo::ops::cargo_compile::compile
+  12: cargo::commands::check::exec
+  13: <cargo::cli::Exec>::exec
+  14: cargo::main
+  15: std::sys::backtrace::__rust_begin_short_backtrace::<fn(), ()>
+  16: std::rt::lang_start::<()>::{closure#0}
+  17: std::rt::lang_start_internal
+  18: _main
+   0.034869291s  INFO prepare_target{force=false package_id=enr-cli v1.0.1 (/Users/rumpelstiltskin/Code/Frogfish/axiom/crates/enr-cli) target="enr-cli"}: cargo::core::compiler::fingerprint: fingerprint error for enr-cli v1.0.1 (/Users/rumpelstiltskin/Code/Frogfish/axiom/crates/enr-cli)/Check { test: true }/TargetInner { name: "enr-cli", doc: true, ..: with_path("/Users/rumpelstiltskin/Code/Frogfish/axiom/crates/enr-cli/src/main.rs", Edition2024) }
+   0.034872208s  INFO prepare_target{force=false package_id=enr-cli v1.0.1 (/Users/rumpelstiltskin/Code/Frogfish/axiom/crates/enr-cli) target="enr-cli"}: cargo::core::compiler::fingerprint:     err: failed to read `/Users/rumpelstiltskin/Code/Frogfish/axiom/target/debug/.fingerprint/enr-cli-f1a433ea41a0e27d/test-bin-enr-cli`
+
+Caused by:
+    No such file or directory (os error 2)
+
+Stack backtrace:
+   0: std::backtrace::Backtrace::create
+   1: std::backtrace::Backtrace::capture
+   2: cargo_util::paths::read_bytes
+   3: cargo_util::paths::read
+   4: cargo::core::compiler::fingerprint::_compare_old_fingerprint
+   5: cargo::core::compiler::fingerprint::prepare_target
+   6: cargo::core::compiler::compile
+   7: <cargo::core::compiler::build_runner::BuildRunner>::compile
+   8: cargo::ops::cargo_compile::compile_ws
+   9: cargo::ops::cargo_compile::compile_with_exec
+  10: cargo::ops::cargo_compile::compile
+  11: cargo::commands::check::exec
+  12: <cargo::cli::Exec>::exec
+  13: cargo::main
+  14: std::sys::backtrace::__rust_begin_short_backtrace::<fn(), ()>
+  15: std::rt::lang_start::<()>::{closure#0}
+  16: std::rt::lang_start_internal
+  17: _main
+   0.034991791s  INFO prepare_target{force=false package_id=enr-core v1.0.1 (/Users/rumpelstiltskin/Code/Frogfish/axiom/crates/enr-core) target="enr_core"}: cargo::core::compiler::fingerprint: fingerprint error for enr-core v1.0.1 (/Users/rumpelstiltskin/Code/Frogfish/axiom/crates/enr-core)/Check { test: true }/TargetInner { name_inferred: true, ..: lib_target("enr_core", ["lib"], "/Users/rumpelstiltskin/Code/Frogfish/axiom/crates/enr-core/src/lib.rs", Edition2024) }
+   0.034997583s  INFO prepare_target{force=false package_id=enr-core v1.0.1 (/Users/rumpelstiltskin/Code/Frogfish/axiom/crates/enr-core) target="enr_core"}: cargo::core::compiler::fingerprint:     err: failed to read `/Users/rumpelstiltskin/Code/Frogfish/axiom/target/debug/.fingerprint/enr-core-34eb5122547c3d00/test-lib-enr_core`
+
+Caused by:
+    No such file or directory (os error 2)
+
+Stack backtrace:
+   0: std::backtrace::Backtrace::create
+   1: std::backtrace::Backtrace::capture
+   2: cargo_util::paths::read_bytes
+   3: cargo_util::paths::read
+   4: cargo::core::compiler::fingerprint::_compare_old_fingerprint
+   5: cargo::core::compiler::fingerprint::prepare_target
+   6: cargo::core::compiler::compile
+   7: <cargo::core::compiler::build_runner::BuildRunner>::compile
+   8: cargo::ops::cargo_compile::compile_ws
+   9: cargo::ops::cargo_compile::compile_with_exec
+  10: cargo::ops::cargo_compile::compile
+  11: cargo::commands::check::exec
+  12: <cargo::cli::Exec>::exec
+  13: cargo::main
+  14: std::sys::backtrace::__rust_begin_short_backtrace::<fn(), ()>
+  15: std::rt::lang_start::<()>::{closure#0}
+  16: std::rt::lang_start_internal
+  17: _main
+   0.037475500s  INFO prepare_target{force=false package_id=sda v1.0.1 (/Users/rumpelstiltskin/Code/Frogfish/axiom/crates/sda-cli) target="sda"}: cargo::core::compiler::fingerprint: fingerprint error for sda v1.0.1 (/Users/rumpelstiltskin/Code/Frogfish/axiom/crates/sda-cli)/Check { test: false }/TargetInner { name: "sda", doc: true, ..: with_path("/Users/rumpelstiltskin/Code/Frogfish/axiom/crates/sda-cli/src/main.rs", Edition2024) }
+   0.037480791s  INFO prepare_target{force=false package_id=sda v1.0.1 (/Users/rumpelstiltskin/Code/Frogfish/axiom/crates/sda-cli) target="sda"}: cargo::core::compiler::fingerprint:     err: failed to read `/Users/rumpelstiltskin/Code/Frogfish/axiom/target/debug/.fingerprint/sda-dafed8de37f0a7ff/bin-sda`
+
+Caused by:
+    No such file or directory (os error 2)
+
+Stack backtrace:
+   0: std::backtrace::Backtrace::create
+   1: std::backtrace::Backtrace::capture
+   2: cargo_util::paths::read_bytes
+   3: cargo_util::paths::read
+   4: cargo::core::compiler::fingerprint::_compare_old_fingerprint
+   5: cargo::core::compiler::fingerprint::prepare_target
+   6: cargo::core::compiler::compile
+   7: <cargo::core::compiler::build_runner::BuildRunner>::compile
+   8: cargo::ops::cargo_compile::compile_ws
+   9: cargo::ops::cargo_compile::compile_with_exec
+  10: cargo::ops::cargo_compile::compile
+  11: cargo::commands::check::exec
+  12: <cargo::cli::Exec>::exec
+  13: cargo::main
+  14: std::sys::backtrace::__rust_begin_short_backtrace::<fn(), ()>
+  15: std::rt::lang_start::<()>::{closure#0}
+  16: std::rt::lang_start_internal
+  17: _main
+   0.039275583s  INFO prepare_target{force=false package_id=sda v1.0.1 (/Users/rumpelstiltskin/Code/Frogfish/axiom/crates/sda-cli) target="sda"}: cargo::core::compiler::fingerprint: fingerprint error for sda v1.0.1 (/Users/rumpelstiltskin/Code/Frogfish/axiom/crates/sda-cli)/Check { test: true }/TargetInner { name: "sda", doc: true, ..: with_path("/Users/rumpelstiltskin/Code/Frogfish/axiom/crates/sda-cli/src/main.rs", Edition2024) }
+   0.039279541s  INFO prepare_target{force=false package_id=sda v1.0.1 (/Users/rumpelstiltskin/Code/Frogfish/axiom/crates/sda-cli) target="sda"}: cargo::core::compiler::fingerprint:     err: failed to read `/Users/rumpelstiltskin/Code/Frogfish/axiom/target/debug/.fingerprint/sda-215e29aec8bff925/test-bin-sda`
+
+Caused by:
+    No such file or directory (os error 2)
+
+Stack backtrace:
+   0: std::backtrace::Backtrace::create
+   1: std::backtrace::Backtrace::capture
+   2: cargo_util::paths::read_bytes
+   3: cargo_util::paths::read
+   4: cargo::core::compiler::fingerprint::_compare_old_fingerprint
+   5: cargo::core::compiler::fingerprint::prepare_target
+   6: cargo::core::compiler::compile
+   7: <cargo::core::compiler::build_runner::BuildRunner>::compile
+   8: cargo::ops::cargo_compile::compile_ws
+   9: cargo::ops::cargo_compile::compile_with_exec
+  10: cargo::ops::cargo_compile::compile
+  11: cargo::commands::check::exec
+  12: <cargo::cli::Exec>::exec
+  13: cargo::main
+  14: std::sys::backtrace::__rust_begin_short_backtrace::<fn(), ()>
+  15: std::rt::lang_start::<()>::{closure#0}
+  16: std::rt::lang_start_internal
+  17: _main
+   0.039474833s  INFO prepare_target{force=false package_id=sda v1.0.1 (/Users/rumpelstiltskin/Code/Frogfish/axiom/crates/sda-cli) target="cli"}: cargo::core::compiler::fingerprint: fingerprint error for sda v1.0.1 (/Users/rumpelstiltskin/Code/Frogfish/axiom/crates/sda-cli)/Check { test: true }/TargetInner { kind: "test", name: "cli", benched: false, ..: with_path("/Users/rumpelstiltskin/Code/Frogfish/axiom/crates/sda-cli/tests/cli.rs", Edition2024) }
+   0.039478750s  INFO prepare_target{force=false package_id=sda v1.0.1 (/Users/rumpelstiltskin/Code/Frogfish/axiom/crates/sda-cli) target="cli"}: cargo::core::compiler::fingerprint:     err: failed to read `/Users/rumpelstiltskin/Code/Frogfish/axiom/target/debug/.fingerprint/sda-d3ae83200a3f9039/test-integration-test-cli`
+
+Caused by:
+    No such file or directory (os error 2)
+
+Stack backtrace:
+   0: std::backtrace::Backtrace::create
+   1: std::backtrace::Backtrace::capture
+   2: cargo_util::paths::read_bytes
+   3: cargo_util::paths::read
+   4: cargo::core::compiler::fingerprint::_compare_old_fingerprint
+   5: cargo::core::compiler::fingerprint::prepare_target
+   6: cargo::core::compiler::compile
+   7: <cargo::core::compiler::build_runner::BuildRunner>::compile
+   8: cargo::ops::cargo_compile::compile_ws
+   9: cargo::ops::cargo_compile::compile_with_exec
+  10: cargo::ops::cargo_compile::compile
+  11: cargo::commands::check::exec
+  12: <cargo::cli::Exec>::exec
+  13: cargo::main
+  14: std::sys::backtrace::__rust_begin_short_backtrace::<fn(), ()>
+  15: std::rt::lang_start::<()>::{closure#0}
+  16: std::rt::lang_start_internal
+  17: _main
+   0.039672583s  INFO prepare_target{force=false package_id=sda-lib v1.0.1 (/Users/rumpelstiltskin/Code/Frogfish/axiom/crates/sda-core) target="sda_lib"}: cargo::core::compiler::fingerprint: fingerprint error for sda-lib v1.0.1 (/Users/rumpelstiltskin/Code/Frogfish/axiom/crates/sda-core)/Check { test: true }/TargetInner { name_inferred: true, ..: lib_target("sda_lib", ["lib"], "/Users/rumpelstiltskin/Code/Frogfish/axiom/crates/sda-core/src/lib.rs", Edition2024) }
+   0.039676208s  INFO prepare_target{force=false package_id=sda-lib v1.0.1 (/Users/rumpelstiltskin/Code/Frogfish/axiom/crates/sda-core) target="sda_lib"}: cargo::core::compiler::fingerprint:     err: failed to read `/Users/rumpelstiltskin/Code/Frogfish/axiom/target/debug/.fingerprint/sda-lib-8c98a0f9784607fd/test-lib-sda_lib`
+
+Caused by:
+    No such file or directory (os error 2)
+
+Stack backtrace:
+   0: std::backtrace::Backtrace::create
+   1: std::backtrace::Backtrace::capture
+   2: cargo_util::paths::read_bytes
+   3: cargo_util::paths::read
+   4: cargo::core::compiler::fingerprint::_compare_old_fingerprint
+   5: cargo::core::compiler::fingerprint::prepare_target
+   6: cargo::core::compiler::compile
+   7: <cargo::core::compiler::build_runner::BuildRunner>::compile
+   8: cargo::ops::cargo_compile::compile_ws
+   9: cargo::ops::cargo_compile::compile_with_exec
+  10: cargo::ops::cargo_compile::compile
+  11: cargo::commands::check::exec
+  12: <cargo::cli::Exec>::exec
+  13: cargo::main
+  14: std::sys::backtrace::__rust_begin_short_backtrace::<fn(), ()>
+  15: std::rt::lang_start::<()>::{closure#0}
+  16: std::rt::lang_start_internal
+  17: _main
+   0.039876250s  INFO prepare_target{force=false package_id=sda-lib v1.0.1 (/Users/rumpelstiltskin/Code/Frogfish/axiom/crates/sda-core) target="sda_conformance"}: cargo::core::compiler::fingerprint: fingerprint error for sda-lib v1.0.1 (/Users/rumpelstiltskin/Code/Frogfish/axiom/crates/sda-core)/Check { test: true }/TargetInner { kind: "test", name: "sda_conformance", benched: false, ..: with_path("/Users/rumpelstiltskin/Code/Frogfish/axiom/crates/sda-core/tests/sda_conformance.rs", Edition2024) }
+   0.039879458s  INFO prepare_target{force=false package_id=sda-lib v1.0.1 (/Users/rumpelstiltskin/Code/Frogfish/axiom/crates/sda-core) target="sda_conformance"}: cargo::core::compiler::fingerprint:     err: failed to read `/Users/rumpelstiltskin/Code/Frogfish/axiom/target/debug/.fingerprint/sda-lib-ffc9b50dda38a4ea/test-integration-test-sda_conformance`
+
+Caused by:
+    No such file or directory (os error 2)
+
+Stack backtrace:
+   0: std::backtrace::Backtrace::create
+   1: std::backtrace::Backtrace::capture
+   2: cargo_util::paths::read_bytes
+   3: cargo_util::paths::read
+   4: cargo::core::compiler::fingerprint::_compare_old_fingerprint
+   5: cargo::core::compiler::fingerprint::prepare_target
+   6: cargo::core::compiler::compile
+   7: <cargo::core::compiler::build_runner::BuildRunner>::compile
+   8: cargo::ops::cargo_compile::compile_ws
+   9: cargo::ops::cargo_compile::compile_with_exec
+  10: cargo::ops::cargo_compile::compile
+  11: cargo::commands::check::exec
+  12: <cargo::cli::Exec>::exec
+  13: cargo::main
+  14: std::sys::backtrace::__rust_begin_short_backtrace::<fn(), ()>
+  15: std::rt::lang_start::<()>::{closure#0}
+  16: std::rt::lang_start_internal
+  17: _main
+   0.040094125s  INFO prepare_target{force=false package_id=shape-cli v1.0.1 (/Users/rumpelstiltskin/Code/Frogfish/axiom/crates/shape-cli) target="shape-cli"}: cargo::core::compiler::fingerprint: fingerprint error for shape-cli v1.0.1 (/Users/rumpelstiltskin/Code/Frogfish/axiom/crates/shape-cli)/Check { test: false }/TargetInner { name: "shape-cli", doc: true, ..: with_path("/Users/rumpelstiltskin/Code/Frogfish/axiom/crates/shape-cli/src/main.rs", Edition2024) }
+   0.040097041s  INFO prepare_target{force=false package_id=shape-cli v1.0.1 (/Users/rumpelstiltskin/Code/Frogfish/axiom/crates/shape-cli) target="shape-cli"}: cargo::core::compiler::fingerprint:     err: failed to read `/Users/rumpelstiltskin/Code/Frogfish/axiom/target/debug/.fingerprint/shape-cli-ca7678b728016f5f/bin-shape-cli`
+
+Caused by:
+    No such file or directory (os error 2)
+
+Stack backtrace:
+   0: std::backtrace::Backtrace::create
+   1: std::backtrace::Backtrace::capture
+   2: cargo_util::paths::read_bytes
+   3: cargo_util::paths::read
+   4: cargo::core::compiler::fingerprint::_compare_old_fingerprint
+   5: cargo::core::compiler::fingerprint::prepare_target
+   6: cargo::core::compiler::compile
+   7: <cargo::core::compiler::build_runner::BuildRunner>::compile
+   8: cargo::ops::cargo_compile::compile_ws
+   9: cargo::ops::cargo_compile::compile_with_exec
+  10: cargo::ops::cargo_compile::compile
+  11: cargo::commands::check::exec
+  12: <cargo::cli::Exec>::exec
+  13: cargo::main
+  14: std::sys::backtrace::__rust_begin_short_backtrace::<fn(), ()>
+  15: std::rt::lang_start::<()>::{closure#0}
+  16: std::rt::lang_start_internal
+  17: _main
+   0.040198541s  INFO prepare_target{force=false package_id=shape-core v1.0.1 (/Users/rumpelstiltskin/Code/Frogfish/axiom/crates/shape-core) target="shape_core"}: cargo::core::compiler::fingerprint: fingerprint error for shape-core v1.0.1 (/Users/rumpelstiltskin/Code/Frogfish/axiom/crates/shape-core)/Check { test: false }/TargetInner { name_inferred: true, ..: lib_target("shape_core", ["lib"], "/Users/rumpelstiltskin/Code/Frogfish/axiom/crates/shape-core/src/lib.rs", Edition2024) }
+   0.040201833s  INFO prepare_target{force=false package_id=shape-core v1.0.1 (/Users/rumpelstiltskin/Code/Frogfish/axiom/crates/shape-core) target="shape_core"}: cargo::core::compiler::fingerprint:     err: failed to read `/Users/rumpelstiltskin/Code/Frogfish/axiom/target/debug/.fingerprint/shape-core-28276c88a2a49e3b/lib-shape_core`
+
+Caused by:
+    No such file or directory (os error 2)
+
+Stack backtrace:
+   0: std::backtrace::Backtrace::create
+   1: std::backtrace::Backtrace::capture
+   2: cargo_util::paths::read_bytes
+   3: cargo_util::paths::read
+   4: cargo::core::compiler::fingerprint::_compare_old_fingerprint
+   5: cargo::core::compiler::fingerprint::prepare_target
+   6: cargo::core::compiler::compile
+   7: cargo::core::compiler::compile
+   8: <cargo::core::compiler::build_runner::BuildRunner>::compile
+   9: cargo::ops::cargo_compile::compile_ws
+  10: cargo::ops::cargo_compile::compile_with_exec
+  11: cargo::ops::cargo_compile::compile
+  12: cargo::commands::check::exec
+  13: <cargo::cli::Exec>::exec
+  14: cargo::main
+  15: std::sys::backtrace::__rust_begin_short_backtrace::<fn(), ()>
+  16: std::rt::lang_start::<()>::{closure#0}
+  17: std::rt::lang_start_internal
+  18: _main
+   0.040308666s  INFO prepare_target{force=false package_id=shape-cli v1.0.1 (/Users/rumpelstiltskin/Code/Frogfish/axiom/crates/shape-cli) target="shape-cli"}: cargo::core::compiler::fingerprint: fingerprint error for shape-cli v1.0.1 (/Users/rumpelstiltskin/Code/Frogfish/axiom/crates/shape-cli)/Check { test: true }/TargetInner { name: "shape-cli", doc: true, ..: with_path("/Users/rumpelstiltskin/Code/Frogfish/axiom/crates/shape-cli/src/main.rs", Edition2024) }
+   0.040311416s  INFO prepare_target{force=false package_id=shape-cli v1.0.1 (/Users/rumpelstiltskin/Code/Frogfish/axiom/crates/shape-cli) target="shape-cli"}: cargo::core::compiler::fingerprint:     err: failed to read `/Users/rumpelstiltskin/Code/Frogfish/axiom/target/debug/.fingerprint/shape-cli-cf23c9a3a3978208/test-bin-shape-cli`
+
+Caused by:
+    No such file or directory (os error 2)
+
+Stack backtrace:
+   0: std::backtrace::Backtrace::create
+   1: std::backtrace::Backtrace::capture
+   2: cargo_util::paths::read_bytes
+   3: cargo_util::paths::read
+   4: cargo::core::compiler::fingerprint::_compare_old_fingerprint
+   5: cargo::core::compiler::fingerprint::prepare_target
+   6: cargo::core::compiler::compile
+   7: <cargo::core::compiler::build_runner::BuildRunner>::compile
+   8: cargo::ops::cargo_compile::compile_ws
+   9: cargo::ops::cargo_compile::compile_with_exec
+  10: cargo::ops::cargo_compile::compile
+  11: cargo::commands::check::exec
+  12: <cargo::cli::Exec>::exec
+  13: cargo::main
+  14: std::sys::backtrace::__rust_begin_short_backtrace::<fn(), ()>
+  15: std::rt::lang_start::<()>::{closure#0}
+  16: std::rt::lang_start_internal
+  17: _main
+   0.040427666s  INFO prepare_target{force=false package_id=shape-core v1.0.1 (/Users/rumpelstiltskin/Code/Frogfish/axiom/crates/shape-core) target="shape_core"}: cargo::core::compiler::fingerprint: fingerprint error for shape-core v1.0.1 (/Users/rumpelstiltskin/Code/Frogfish/axiom/crates/shape-core)/Check { test: true }/TargetInner { name_inferred: true, ..: lib_target("shape_core", ["lib"], "/Users/rumpelstiltskin/Code/Frogfish/axiom/crates/shape-core/src/lib.rs", Edition2024) }
+   0.040430666s  INFO prepare_target{force=false package_id=shape-core v1.0.1 (/Users/rumpelstiltskin/Code/Frogfish/axiom/crates/shape-core) target="shape_core"}: cargo::core::compiler::fingerprint:     err: failed to read `/Users/rumpelstiltskin/Code/Frogfish/axiom/target/debug/.fingerprint/shape-core-fe3eedf44889b223/test-lib-shape_core`
+
+Caused by:
+    No such file or directory (os error 2)
+
+Stack backtrace:
+   0: std::backtrace::Backtrace::create
+   1: std::backtrace::Backtrace::capture
+   2: cargo_util::paths::read_bytes
+   3: cargo_util::paths::read
+   4: cargo::core::compiler::fingerprint::_compare_old_fingerprint
+   5: cargo::core::compiler::fingerprint::prepare_target
+   6: cargo::core::compiler::compile
+   7: <cargo::core::compiler::build_runner::BuildRunner>::compile
+   8: cargo::ops::cargo_compile::compile_ws
+   9: cargo::ops::cargo_compile::compile_with_exec
+  10: cargo::ops::cargo_compile::compile
+  11: cargo::commands::check::exec
+  12: <cargo::cli::Exec>::exec
+  13: cargo::main
+  14: std::sys::backtrace::__rust_begin_short_backtrace::<fn(), ()>
+  15: std::rt::lang_start::<()>::{closure#0}
+  16: std::rt::lang_start_internal
+  17: _main
+    Checking shape-core v1.0.1 (/Users/rumpelstiltskin/Code/Frogfish/axiom/crates/shape-core)
+    Checking enr-core v1.0.1 (/Users/rumpelstiltskin/Code/Frogfish/axiom/crates/enr-core)
+    Checking sda-lib v1.0.1 (/Users/rumpelstiltskin/Code/Frogfish/axiom/crates/sda-core)
+    Checking enr-cli v1.0.1 (/Users/rumpelstiltskin/Code/Frogfish/axiom/crates/enr-cli)
+    Checking shape-cli v1.0.1 (/Users/rumpelstiltskin/Code/Frogfish/axiom/crates/shape-cli)
+    Checking sda v1.0.1 (/Users/rumpelstiltskin/Code/Frogfish/axiom/crates/sda-cli)
+    Checking axiom-cli v1.0.1 (/Users/rumpelstiltskin/Code/Frogfish/axiom/crates/axiom-cli)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.45s
