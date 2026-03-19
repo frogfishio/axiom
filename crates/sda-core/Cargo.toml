@@ -1,10 +1,17 @@
 [package]
-name = "sda-core"
+name = "sda-lib"
 version.workspace = true
 edition.workspace = true
-license.workspace = true
-authors.workspace = true
-repository.workspace = true
+license = "GPL-3.0-or-later"
+authors = ["Alexander R. Croft"]
+description = "Structured Data Algebra as a pure Rust library for validating, formatting, and transforming structured data."
+readme = "README.md"
+documentation = "https://docs.rs/sda-lib"
+homepage = "https://github.com/example/axiom"
+repository = "https://github.com/example/axiom"
+keywords = ["sda", "json", "transformation", "algebra", "validation"]
+categories = ["data-structures", "parser-implementations", "text-processing"]
+include = ["Cargo.toml", "README.md", "src/**", "tests/**"]
 
 [dependencies]
 serde_json.workspace = true

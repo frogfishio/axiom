@@ -60,9 +60,9 @@ checksum = "c08606f8c3cbf4ce6ec8e28fb0014a2c086708fe954eaa885384a6165172e7e8"
 
 [[package]]
 name = "axiom-cli"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
- "sda-core",
+ "sda-lib",
 ]
 
 [[package]]
@@ -113,14 +113,14 @@ checksum = "1d07550c9036bf2ae0c684c4297d503f838287c83c53686d05370d0e139ae570"
 
 [[package]]
 name = "enr-cli"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "enr-core",
 ]
 
 [[package]]
 name = "enr-core"
-version = "0.1.0"
+version = "1.0.0"
 
 [[package]]
 name = "heck"
@@ -210,17 +210,17 @@ dependencies = [
 ]
 
 [[package]]
-name = "sda-cli"
-version = "0.1.0"
+name = "sda"
+version = "1.0.0"
 dependencies = [
  "clap",
- "sda-core",
+ "sda-lib",
  "serde_json",
 ]
 
 [[package]]
-name = "sda-core"
-version = "0.1.0"
+name = "sda-lib"
+version = "1.0.0"
 dependencies = [
  "num-bigint",
  "num-rational",
@@ -273,14 +273,14 @@ dependencies = [
 
 [[package]]
 name = "shape-cli"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "shape-core",
 ]
 
 [[package]]
 name = "shape-core"
-version = "0.1.0"
+version = "1.0.0"
 
 [[package]]
 name = "strsim"

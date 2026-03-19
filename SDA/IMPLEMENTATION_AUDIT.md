@@ -9,7 +9,7 @@ It is a spec-driven implementation audit.
 
 Baseline verified on 2026-03-19:
 
-- `cargo test -p sda-core` passes
+- `cargo test -p sda-lib` passes
 - the main outstanding work is semantic-contract alignment, not repairing a failing build
 
 ## Status Summary

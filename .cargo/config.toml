@@ -1,4 +1,4 @@
 [alias]
 test-all = "test --workspace"
-sda-test = "test -p sda-core"
-sda-run = "run -p sda-cli --bin sda --"
+sda-test = "test -p sda-lib"
+sda-run = "run -p sda --bin sda --"

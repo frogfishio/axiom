@@ -2,6 +2,7 @@
 
 VERSION_FILE := VERSION
 BUILD_FILE := BUILD
+CLI_BUILD_FILE := crates/sda-cli/BUILD
 BIN_NAME := sda
 DIST_ROOT := dist/bin
 TARGET_DIR := target
@@ -39,8 +40,10 @@ dist:
 		*) next_build="$$((current_build + 1))" ;; \
 	esac; \
 	printf '%s\n' "$$next_build" > $(BUILD_FILE); \
+	printf '%s\n' "$$next_build" > $(CLI_BUILD_FILE); \
 	echo "Bumped $(BUILD_FILE): $$current_build -> $$next_build"; \
-	cargo build --release -p sda-cli --bin $(BIN_NAME); \
+	echo "Synced $(CLI_BUILD_FILE) to $$next_build"; \
+	cargo build --release -p sda --bin $(BIN_NAME); \
 	mkdir -p $(DIST_DIR); \
 	cp $(RELEASE_BIN) $(DIST_DIR)/$(BIN_NAME); \
 	echo "Copied $(RELEASE_BIN) -> $(DIST_DIR)/$(BIN_NAME)"

@@ -1,3 +1,15 @@
+//! Structured Data Algebra as a pure Rust library.
+//!
+//! `sda-lib` parses, validates, formats, and evaluates standalone SDA programs.
+//! The public API is intentionally small so host applications can bind JSON input,
+//! run a program, and recover canonical JSON output without embedding CLI concerns.
+//!
+//! ```rust
+//! let output = sda_lib::run("input<\"name\">!", serde_json::json!({"name": "Ada"}))?;
+//! assert_eq!(output, serde_json::json!({"$type": "ok", "$value": "Ada"}));
+//! # Ok::<(), sda_lib::SdaError>(())
+//! ```
+
 mod ast;
 mod format;
 mod lexer;
@@ -24,7 +36,7 @@ pub struct SdaRuntime;
 impl SdaRuntime {
     #[must_use]
     pub fn name() -> &'static str {
-        "sda-core"
+        "sda-lib"
     }
 }
 

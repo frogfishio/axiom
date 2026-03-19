@@ -1,4 +1,4 @@
-use sda_core::{run, run_with_input_binding, SdaError};
+use sda_lib::{run, run_with_input_binding, SdaError};
 
 fn run_json(expr: &str) -> serde_json::Value {
     run(expr, serde_json::Value::Null).expect("run failed")

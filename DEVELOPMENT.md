@@ -9,10 +9,10 @@ This repository is a Rust workspace. The active SDA implementation now lives in 
 
 ```sh
 cargo test --workspace
-cargo test -p sda-core
-cargo run -p sda-cli --bin sda -- '1 + 2'
-echo '{"name":"Ada"}' | cargo run -p sda-cli --bin sda -- 'input<"name">!'
-echo '{"name":"Ada"}' | cargo run -p sda-cli --bin sda -- --bind root 'root<"name">!'
+cargo test -p sda-lib
+cargo run -p sda --bin sda -- '1 + 2'
+echo '{"name":"Ada"}' | cargo run -p sda --bin sda -- 'input<"name">!'
+echo '{"name":"Ada"}' | cargo run -p sda --bin sda -- --bind root 'root<"name">!'
 ```
 
 If you want shorter commands, the workspace defines cargo aliases in `.cargo/config.toml`:

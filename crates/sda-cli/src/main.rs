@@ -1,7 +1,7 @@
 use clap::{ArgAction, Args, Parser, Subcommand};
 use std::io::{IsTerminal, Read};
 
-const APP_VERSION: &str = concat!(env!("AXIOM_VERSION"), "-build ", env!("AXIOM_BUILD"));
+const APP_VERSION: &str = concat!(env!("SDA_VERSION"), "-build ", env!("SDA_BUILD"));
 const CLI_ABOUT: &str = "Structured Data Algebra command-line interface";
 const CLI_LONG_ABOUT: &str = "Structured Data Algebra command-line interface\n\nEvaluate, validate, and format standalone SDA programs against JSON input.\n\nThe shipped surface is the `sda` binary: use `sda eval` to run filters, `sda check` to validate source, and `sda fmt` to emit canonical SDA source for editor and CI workflows.";
 const CLI_AFTER_HELP: &str = "Examples:\n  sda eval -e 'values(input)' < event.json\n  sda eval -f extract.sda -i event.json --compact\n  sda check -f extract.sda\n  sda fmt -f extract.sda --check\n  sda fmt --stdin-filepath extract.sda < extract.sda\n  sda --license";
