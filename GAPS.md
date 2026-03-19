@@ -52,14 +52,17 @@ Decision note:
 - [x] Add conformance tests for all stable error codes and message strings.
 
 Decision note:
-Standalone SDA now treats wrong-shape semantic misuse as SDA `Fail(t_sda_wrong_shape, "wrong shape")` across operators, comprehensions, helpers, and core combinators. Parse-time/static conditions remain parse diagnostics. Invocation-level concerns such as unbound names, bad call arity, division by zero, and not-callable values remain host/profile diagnostics for now.
+Standalone SDA now treats wrong-shape semantic misuse as SDA `Fail(t_sda_wrong_shape, "wrong shape")` across operators, comprehensions, helpers, and core combinators. Numeric division by zero is also a stable SDA failure: `Fail(t_sda_div_by_zero, "division by zero")`. Parse-time/static conditions remain parse diagnostics. Invocation-level concerns such as unbound names, bad call arity, and not-callable values remain host/profile diagnostics for now.
 
 ## CLI And Tooling
 
 - [x] Replace the ad hoc positional CLI with the intended command surface (`eval`, `check`, `fmt` at minimum).
-- [ ] Add fixture-driven CLI tests that exercise stdin, file input, stdout, and failure exits.
-- [ ] Add a formatter or canonical pretty-printer plan for SDA source.
+- [x] Add fixture-driven CLI tests that exercise stdin, file input, stdout, and failure exits.
+- [x] Add a formatter or canonical pretty-printer plan for SDA source.
 - [ ] Decide whether `cargo sda-run` remains a developer alias only or becomes part of documented workflow.
+
+Decision note:
+`fmt` now exists as a parse-validating pass-through stub. It closes the CLI surface contract without yet claiming a canonical reformatter.
 
 ## Conformance Harness
 

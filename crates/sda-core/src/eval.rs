@@ -17,8 +17,6 @@ pub enum EvalError {
     DuplicateKey(String),
     #[error("Not callable: {0}")]
     NotCallable(String),
-    #[error("Division by zero")]
-    DivByZero,
     #[error("Arity mismatch: expected {expected}, got {got}")]
     ArityMismatch { expected: usize, got: usize },
 }
@@ -29,6 +27,10 @@ fn fail_value(code: &str, msg: &str) -> Value {
 
 fn wrong_shape_value() -> Value {
     fail_value("t_sda_wrong_shape", "wrong shape")
+}
+
+fn div_by_zero_value() -> Value {
+    fail_value("t_sda_div_by_zero", "division by zero")
 }
 
 pub(crate) fn ensure_comparable(value: &Value) -> Result<(), EvalError> {
@@ -392,7 +394,7 @@ fn eval_binop(op: &BinOpKind, lhs: Value, rhs: Value) -> Result<Value, EvalError
         BinOpKind::Div => match (lhs, rhs) {
             (Value::Num(a), Value::Num(b)) => {
                 if b.is_zero() {
-                    Err(EvalError::DivByZero)
+                    Ok(div_by_zero_value())
                 } else {
                     Ok(Value::Num(a.div(&b)))
                 }

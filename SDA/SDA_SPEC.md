@@ -592,8 +592,16 @@ Sequences support:
 Standalone note:
 
 - In standalone SDA, `Map` keys are strings and `Prod` field labels are strings, so map or prod membership is a string-label membership test.
-- In standalone SDA, if the left-hand side of map or prod membership is not a string label, the result is `false` rather than a shape failure.
+- In standalone SDA, if the left-hand side of map or prod membership is not a string label, the result is `Fail(t_sda_wrong_shape, "wrong shape")` rather than `false`.
 - Hosts that extend the `Map` key domain must preserve the same carrier-relative meaning.
+
+### 8.4.1 Division by zero
+
+Numeric division is defined only for numeric operands with a non-zero divisor.
+
+- If either operand is non-numeric, the result is `Fail(t_sda_wrong_shape, "wrong shape")`.
+- If the divisor is numeric zero, the result is `Fail(t_sda_div_by_zero, "division by zero")`.
+- Otherwise numeric division returns the exact rational quotient.
 
 ### 8.5 Algebraic laws (Informative)
 
@@ -933,6 +941,7 @@ Hosts may add more helpers or profile conveniences, but not by redefining the ab
 These codes are stable and MUST be used by conforming implementations.
 
 - `t_sda_wrong_shape`
+- `t_sda_div_by_zero`
 - `t_sda_missing_key`
 - `t_sda_duplicate_key`
 - `t_sda_selector_not_static`

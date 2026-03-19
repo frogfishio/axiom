@@ -107,6 +107,11 @@ mod section_8_algebra {
     use super::*;
 
     #[test]
+    fn division_by_zero_is_stable() {
+        assert_fail("1 / 0;", "t_sda_div_by_zero", "division by zero");
+    }
+
+    #[test]
     fn set_union_is_canonical() {
         assert_eq!(
             run_json("Set{3, 1} union Set{2, 1};"),

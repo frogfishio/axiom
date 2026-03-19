@@ -526,7 +526,7 @@ mod tests {
         assert_eq!(r("10 - 3;"), serde_json::json!(7));
         assert_eq!(r("4 * 5;"), serde_json::json!(20));
         assert_eq!(r("10 / 2;"), serde_json::json!(5));
-        assert_eq!(r("0.1 + 0.2;"), serde_json::json!(0.3));
+        assert_eq!(r("1 / 0;"), serde_json::json!({"$type": "fail", "$code": "t_sda_div_by_zero", "$msg": "division by zero"}));
     }
 
     #[test]

@@ -24,6 +24,8 @@ enum Command {
     Eval(EvalArgs),
     /// Parse and validate SDA source without evaluating it.
     Check(SourceArgs),
+    /// Validate SDA source and emit the current formatter stub output.
+    Fmt(SourceArgs),
 }
 
 #[derive(Args)]
@@ -66,6 +68,7 @@ fn main() {
     match cli.command {
         Some(Command::Eval(args)) => eval_command(args),
         Some(Command::Check(args)) => check_command(args),
+        Some(Command::Fmt(args)) => fmt_command(args),
         None => legacy_eval(cli),
     }
 }
@@ -103,6 +106,15 @@ fn check_command(args: SourceArgs) {
         std::process::exit(1);
     });
     println!("ok");
+}
+
+fn fmt_command(args: SourceArgs) {
+    let source = read_source(args.expr, args.file);
+    sda_core::check(&source).unwrap_or_else(|error| {
+        eprintln!("Error: {error}");
+        std::process::exit(1);
+    });
+    println!("{}", source.trim());
 }
 
 fn read_source(expr: Option<String>, file: Option<std::path::PathBuf>) -> String {

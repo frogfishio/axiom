@@ -78,33 +78,42 @@ The implementation still exposes many dynamic conditions as host-side `EvalError
 Examples include:
 
 - `UnboundVar`
-- `TypeError`
 - `NotCallable`
-- `DivByZero`
 - `ArityMismatch`
 
-This is the single biggest remaining semantic decision.
+The main remaining ambiguity is now narrower than before.
 
 Required decision:
 
 - which of these become SDA-stable semantic failures
 - which remain host/profile diagnostics
 
-Until this is fixed, the language boundary is still partially ambiguous.
+Status update:
+
+- wrong-shape semantic misuse has now been normalized to `Fail(t_sda_wrong_shape, ...)`
+- division by zero has now been normalized to `Fail(t_sda_div_by_zero, ...)`
+
+The remaining open invocation/profile boundary is now mostly about:
+
+- unbound names
+- not-callable values
+- arity mismatch
 
 ### 2. Conformance Coverage Is Too Small For The Real Contract
 
 The spec has been tightened, but the conformance suite still lags behind the actual semantic surface.
 
-Important gaps include:
+Important remaining gaps are smaller now.
 
-- full comprehension coverage by spec section
-- explicit pipe composition cases using placeholder-based stages
+The spec-indexed harness now covers:
+
+- comprehensions
+- explicit pipe composition and non-implicit application
 - membership on `Seq`, `Map`, and `Prod`
-- profile helper behavior beyond the current minimal cases
-- failure-boundary tests for combinators and operator misuse
+- helper misuse and success cases
+- worked examples from the spec
 
-The implementation has useful unit tests, but much semantic proof still lives outside the spec-indexed conformance harness.
+The main remaining proof gaps are parser-boundary regressions and CLI black-box coverage rather than the core semantics above.
 
 ### 3. Standalone Grammar And Parser Still Differ On A Few Boundary Conditions
 
@@ -119,19 +128,19 @@ Important examples:
 
 This is not a correctness disaster, but it is still weaker than the clarified spec posture.
 
-### 4. Helper And Combinator Error Boundaries Are Still Hostish
+### 4. Helper And Combinator Error Boundaries
 
-The standalone helpers and core combinators mostly implement the right success semantics, but their wrong-shape and bad-arity behavior is inconsistent.
+The standalone helpers and core combinators now mostly implement the right success semantics, and wrong-shape behavior is substantially more consistent.
 
-Some helpers return SDA `Fail(...)` values for wrong-shape carrier conditions.
-Others still raise host-side `EvalError::TypeError` or `ArityMismatch`.
+Wrong-shape misuse now resolves to SDA `Fail(...)` values across the main standalone surface.
+Remaining host-side issues are mostly invocation-level, especially arity and callability.
 
 This inconsistency matters because helpers are now explicitly divided between:
 
 - core combinators
 - standalone profile helpers
 
-The repository needs one rule for how misuse is surfaced in each category.
+The repository still needs one final explicit rule for invocation misuse across all callable forms.
 
 ### 5. Spec Examples Are Now Sharper Than The Tests
 
@@ -145,47 +154,39 @@ That creates a regression risk:
 
 ## Prioritized Worklist
 
-### Priority 1: Close The Failure Boundary
+### Priority 1: Close The Remaining Invocation Boundary
 
 1. Decide the final taxonomy for dynamic misuse:
    - SDA `Fail(code, msg)`
    - parse/static rejection
    - profile/invocation diagnostics
 
-2. Apply that rule consistently across:
-   - operators
-   - combinators
-   - helper functions
+2. Apply that remaining rule consistently across:
    - lambda application
+   - named callable lookup
+   - CLI/runtime invocation boundaries
 
 3. Update conformance tests so the chosen boundary is provable.
 
-### Priority 2: Expand Spec-Indexed Conformance
+### Priority 2: Tighten Diagnostics And CLI Coverage
 
-4. Add a complete `§9 Comprehensions` conformance block.
-5. Add `§10 Pipe` coverage beyond unbound placeholder.
-6. Add membership coverage for `Seq`, `Map`, and `Prod`.
-7. Add helper-profile conformance for `typeOf`, `keys`, `values`, and `count` misuse as well as success cases.
+4. Improve parser diagnostics where standalone restrictions matter materially.
+5. Add CLI black-box tests for `eval`, `check`, and `fmt`.
 
-### Priority 3: Tighten Diagnostics And Parse Boundaries
+### Priority 3: Keep The Spec Executable
 
-8. Improve parser diagnostics where standalone restrictions matter materially.
-9. Decide whether any additional stable parse-time tags are needed or whether generic parse diagnostics remain sufficient outside the current tagged cases.
+6. Decide whether any additional stable parse-time tags are needed or whether generic parse diagnostics remain sufficient outside the current tagged cases.
 
-### Priority 4: Keep The Spec Executable
-
-10. Add regression tests that replay the worked examples from `SDA/SDA_SPEC.md`.
-11. Add regression tests that prove the standalone profile rejects or avoids the old ambiguous readings:
+7. Add regression tests that prove the standalone profile rejects or avoids the old ambiguous readings:
     - no implicit pipe application
     - no required general `k -> v` expression sugar
 
 ## Recommended Implementation Order
 
-1. Freeze the failure taxonomy.
-2. Expand conformance to match the clarified spec.
-3. Refactor helper and operator misuse paths to match the taxonomy.
-4. Improve parser diagnostics only after the semantic boundary is fixed.
-5. Revisit CLI ergonomics after the semantic contract is closed.
+1. Finish the remaining invocation-boundary decision.
+2. Improve parser diagnostics where the standalone profile is intentionally strict.
+3. Add and keep CLI black-box tests.
+4. Revisit canonical formatting after the command surface is stable.
 
 ## Exit Criteria
 
