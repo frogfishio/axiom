@@ -80,6 +80,14 @@ impl Parser {
         }
     }
 
+    fn expected_generator_expr_error(&self) -> ParseError {
+        ParseError::Expected(
+            "generator expression `name in collection`".to_string(),
+            self.peek().clone(),
+            self.peek_pos(),
+        )
+    }
+
     fn parse_program(&mut self) -> Result<Program, ParseError> {
         let mut stmts = Vec::new();
         while *self.peek() != TokenKind::Eof {
@@ -551,6 +559,10 @@ impl Parser {
             });
         }
 
+        if matches!(first_expr, Expr::BinOp(BinOpKind::In, _, _)) {
+            return Err(self.expected_generator_expr_error());
+        }
+
         self.expect(TokenKind::Bar)?;
         let (binding, collection) = self.parse_generator_expr()?;
         let pred = if *self.peek() == TokenKind::Bar {
@@ -570,13 +582,7 @@ impl Parser {
 
     fn parse_generator_expr(&mut self) -> Result<(String, Expr), ParseError> {
         let expr = self.parse_expr()?;
-        Self::decompose_generator_expr(expr).ok_or_else(|| {
-            ParseError::Expected(
-                "generator expression `name in collection`".to_string(),
-                self.peek().clone(),
-                self.peek_pos(),
-            )
-        })
+        Self::decompose_generator_expr(expr).ok_or_else(|| self.expected_generator_expr_error())
     }
 
     fn decompose_generator_expr(expr: Expr) -> Option<(String, Expr)> {

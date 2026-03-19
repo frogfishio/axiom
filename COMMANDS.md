@@ -96,13 +96,16 @@ sda eval -f extract.sda < event.json
 sda eval -e 'Map{ "x" -> 1 }' < input.json
 sda check -f extract.sda
 sda fmt -f extract.sda
+sda fmt --stdin-filepath extract.sda < extract.sda
+sda fmt -f extract.sda --check
+sda fmt -f extract.sda --write
 ```
 
 ### Minimum v0 subcommands
 
 - `eval`: run a program
 - `check`: parse and validate
-- `fmt`: normalize source formatting later if needed
+- `fmt`: parse, validate, emit canonical SDA source, read from stdin for editor integrations, or enforce it with `--check` / `--write`
 
 ### Example
 
@@ -298,7 +301,7 @@ The first commands worth implementing are:
 
 1. `sda eval`
 2. `sda check`
-3. `sda fmt` if needed
+3. `sda fmt`
 4. `axiom http`
 5. `axiom run`
 6. `enr eval`

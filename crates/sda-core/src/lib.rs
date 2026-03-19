@@ -1,4 +1,5 @@
 mod ast;
+mod format;
 mod lexer;
 mod number;
 mod parser;
@@ -167,6 +168,11 @@ pub fn run_with_input_binding(
 
 pub fn check(expr: &str) -> Result<(), SdaError> {
     parse_source(expr).map(|_| ())
+}
+
+pub fn format_source(expr: &str) -> Result<String, SdaError> {
+    let program = parse_source(expr)?;
+    Ok(format::format_program(&program))
 }
 
 fn parse_source(expr: &str) -> Result<ast::Program, SdaError> {
@@ -1424,6 +1430,65 @@ mod tests {
     fn test_static_selector_duplicate_label_is_rejected() {
         let err = run("{a a};", serde_json::Value::Null).unwrap_err();
         assert!(matches!(err, SdaError::Parse(ParseError::DuplicateLabelInSelector)));
+    }
+
+    #[test]
+    fn test_invalid_comprehension_generator_binding_reports_generator_shape() {
+        let err = run("{ 1 in Seq[1] };", serde_json::Value::Null).unwrap_err();
+        match err {
+            SdaError::Parse(ParseError::Expected(expected, _, _)) => {
+                assert_eq!(expected, "generator expression `name in collection`");
+            }
+            other => panic!("expected generator-shape parse error, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn test_format_source_normalizes_spacing_and_keywords() {
+        let formatted = format_source(" let x=1+2; values( input ) ").unwrap();
+        assert_eq!(formatted, "let x = 1 + 2;\nvalues(input);\n");
+    }
+
+    #[test]
+    fn test_format_source_canonicalizes_selectors_and_bagkv_keys() {
+        let formatted = format_source(r#"BagKV{"two words" -> 1, key -> input<name>!};"#).unwrap();
+        assert_eq!(formatted, "BagKV{\"two words\" -> 1, key -> input<\"name\">!};\n");
+    }
+
+    #[test]
+    fn test_format_source_preserves_precedence_for_lambda_and_pipe() {
+        let formatted = format_source("1 |> (x => x + 1);").unwrap();
+        assert_eq!(formatted, "1 |> (x => x + 1);\n");
+    }
+
+    #[test]
+    fn test_format_source_preserves_precedence_for_lambda_call_and_unary() {
+        let formatted = format_source("(-(1 + 2)) + ((x => x + 1)(3));").unwrap();
+        assert_eq!(formatted, "-(1 + 2) + (x => x + 1)(3);\n");
+    }
+
+    #[test]
+    fn test_format_source_preserves_right_associative_sensitive_grouping() {
+        let formatted = format_source("1 - (2 - 3);").unwrap();
+        assert_eq!(formatted, "1 - (2 - 3);\n");
+    }
+
+    #[test]
+    fn test_format_source_canonicalizes_comprehension_spacing() {
+        let formatted = format_source("{yield x+1|x in Seq[1,2,3]|x>1 and x<3};").unwrap();
+        assert_eq!(formatted, "{ yield x + 1 | x in Seq[1, 2, 3] | x > 1 and x < 3 };\n");
+    }
+
+    #[test]
+    fn test_format_source_canonicalizes_nested_selector_and_call_chains() {
+        let formatted = format_source("f(input<name>!)(g((1 + 2) * 3));").unwrap();
+        assert_eq!(formatted, "f(input<\"name\">!)(g((1 + 2) * 3));\n");
+    }
+
+    #[test]
+    fn test_format_source_canonicalizes_selector_after_call() {
+        let formatted = format_source("(f(input))<name>?;").unwrap();
+        assert_eq!(formatted, "f(input)<\"name\">?;\n");
     }
 
     #[test]

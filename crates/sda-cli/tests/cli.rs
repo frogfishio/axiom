@@ -76,14 +76,98 @@ fn check_reports_ok_for_valid_source() {
 }
 
 #[test]
-fn fmt_echoes_valid_source_stub() {
+fn fmt_emits_canonical_source() {
     let output = sda_bin()
-        .args(["fmt", "-e", "  values(input)  "])
+        .args(["fmt", "-e", " let x=1+2; input<name>! "])
         .output()
         .expect("run sda fmt");
 
     assert!(output.status.success(), "stderr: {}", String::from_utf8_lossy(&output.stderr));
-    assert_eq!(String::from_utf8_lossy(&output.stdout), "values(input)\n");
+    assert_eq!(String::from_utf8_lossy(&output.stdout), "let x = 1 + 2;\ninput<\"name\">!;\n");
+}
+
+#[test]
+fn fmt_reads_source_from_stdin() {
+    let mut child = sda_bin()
+        .args(["fmt", "--stdin-filepath", "editor-buffer.sda"])
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .spawn()
+        .expect("spawn sda fmt");
+
+    use std::io::Write;
+    child
+        .stdin
+        .as_mut()
+        .expect("stdin")
+        .write_all(br#" let x=1+2; input<name>! "#)
+        .expect("write stdin");
+    drop(child.stdin.take());
+
+    let output = child.wait_with_output().expect("wait output");
+    assert!(output.status.success(), "stderr: {}", String::from_utf8_lossy(&output.stderr));
+    assert_eq!(String::from_utf8_lossy(&output.stdout), "let x = 1 + 2;\ninput<\"name\">!;\n");
+}
+
+#[test]
+fn fmt_check_succeeds_for_canonical_source() {
+    let output = sda_bin()
+        .args(["fmt", "-e", "let x = 1 + 2;", "--check"])
+        .output()
+        .expect("run sda fmt --check");
+
+    assert!(output.status.success(), "stderr: {}", String::from_utf8_lossy(&output.stderr));
+    assert!(output.stdout.is_empty());
+}
+
+#[test]
+fn fmt_check_exits_nonzero_for_noncanonical_source() {
+    let output = sda_bin()
+        .args(["fmt", "-e", "let x=1+2;", "--check"])
+        .output()
+        .expect("run noncanonical sda fmt --check");
+
+    assert!(!output.status.success());
+    assert!(String::from_utf8_lossy(&output.stderr).contains("not canonically formatted"));
+}
+
+#[test]
+fn fmt_check_succeeds_for_canonical_stdin_source() {
+    let mut child = sda_bin()
+        .args(["fmt", "--check", "--stdin-filepath", "editor-buffer.sda"])
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .spawn()
+        .expect("spawn sda fmt --check");
+
+    use std::io::Write;
+    child
+        .stdin
+        .as_mut()
+        .expect("stdin")
+        .write_all(b"let x = 1 + 2;\n")
+        .expect("write stdin");
+    drop(child.stdin.take());
+
+    let output = child.wait_with_output().expect("wait output");
+    assert!(output.status.success(), "stderr: {}", String::from_utf8_lossy(&output.stderr));
+    assert!(output.stdout.is_empty());
+}
+
+#[test]
+fn fmt_write_rewrites_source_file() {
+    let source_path = unique_temp_path("format-write.sda");
+    fs::write(&source_path, " let x=1+2; input<name>! ").expect("write source file");
+
+    let output = sda_bin()
+        .args(["fmt", "-f", source_path.to_str().expect("source path str"), "--write"])
+        .output()
+        .expect("run sda fmt --write");
+
+    assert!(output.status.success(), "stderr: {}", String::from_utf8_lossy(&output.stderr));
+    assert_eq!(fs::read_to_string(&source_path).expect("read source file"), "let x = 1 + 2;\ninput<\"name\">!;\n");
+
+    let _ = fs::remove_file(&source_path);
 }
 
 #[test]
@@ -95,4 +179,38 @@ fn check_exits_nonzero_for_invalid_source() {
 
     assert!(!output.status.success());
     assert!(String::from_utf8_lossy(&output.stderr).contains("Error:"));
+}
+
+#[test]
+fn fmt_exits_nonzero_for_invalid_source() {
+    let output = sda_bin()
+        .args(["fmt", "-e", "let x = ;"])
+        .output()
+        .expect("run invalid sda fmt");
+
+    assert!(!output.status.success());
+    assert!(String::from_utf8_lossy(&output.stderr).contains("Error:"));
+}
+
+#[test]
+fn eval_exits_nonzero_for_invalid_input_json() {
+    let mut child = sda_bin()
+        .args(["eval", "-e", "input"])
+        .stdin(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .expect("spawn sda");
+
+    use std::io::Write;
+    child
+        .stdin
+        .as_mut()
+        .expect("stdin")
+        .write_all(br#"{"#)
+        .expect("write invalid stdin");
+    drop(child.stdin.take());
+
+    let output = child.wait_with_output().expect("wait output");
+    assert!(!output.status.success());
+    assert!(String::from_utf8_lossy(&output.stderr).contains("invalid input JSON"));
 }

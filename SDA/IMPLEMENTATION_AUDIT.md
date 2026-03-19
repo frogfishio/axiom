@@ -112,7 +112,7 @@ The spec now defines the standalone position more clearly, and the parser now co
 
 Important examples:
 
-- unsupported comprehension shapes
+- unsupported comprehension shapes now reject with an explicit generator-shape diagnostic when the source looks like `... in ...` but the binding is not an identifier
 - invalid selector-like constructs
 - other standalone profile restrictions not yet given explicit stable tags
 
@@ -148,7 +148,7 @@ That creates a regression risk:
 
 1. Decide whether any additional parse-time standalone restrictions deserve stable tags.
 
-2. Apply that rule consistently across remaining unsupported comprehension or selector-edge forms.
+2. Apply that rule consistently across any remaining unsupported selector-edge or other standalone-only forms that are still weaker than the clarified profile.
 
 3. Update conformance tests so the chosen parse boundary is provable.
 

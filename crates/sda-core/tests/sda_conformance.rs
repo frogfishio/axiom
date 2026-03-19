@@ -504,6 +504,15 @@ mod section_12_static_selector_errors {
     }
 
     #[test]
+    fn invalid_generator_binding_reports_generator_shape() {
+        assert_parse_error(
+            "{ 1 in Seq[1] };",
+            "Expected generator expression `name in collection`",
+            "generator expression `name in collection`",
+        );
+    }
+
+    #[test]
     fn general_bind_sugar_is_not_required_in_standalone() {
         assert_parse_error(
             r#"{ yield "x" -> 1 | a in Seq[1] };"#,

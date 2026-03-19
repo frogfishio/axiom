@@ -48,21 +48,22 @@ Decision note:
 - [x] Implement the remaining stable error tags listed in the SDA spec.
 - [x] Freeze the final failure taxonomy across static rejection, SDA `Fail(code, msg)`, and profile / host diagnostics.
 - [x] Separate runtime type and invocation errors from spec-stable `Fail(code, msg)` results according to that taxonomy.
-- [ ] Improve parser diagnostics around selector ambiguity, invalid map keys, and unsupported comprehension forms.
+- [x] Improve parser diagnostics around selector ambiguity, invalid map keys, and unsupported comprehension forms.
 - [x] Add conformance tests for all stable error codes and message strings.
 
 Decision note:
-Standalone SDA now treats wrong-shape semantic misuse as SDA `Fail(t_sda_wrong_shape, "wrong shape")` across operators, comprehensions, helpers, and core combinators. Numeric division by zero is also a stable SDA failure: `Fail(t_sda_div_by_zero, "division by zero")`. Unbound names, bad call arity, and not-callable invocation are now stable SDA failures as well: `t_sda_unbound_name`, `t_sda_arity_mismatch`, and `t_sda_not_callable`. Parse-time/static conditions remain parse diagnostics, with stable tags now covering reserved placeholder misuse and invalid standalone keyed-literal entries.
+Standalone SDA now treats wrong-shape semantic misuse as SDA `Fail(t_sda_wrong_shape, "wrong shape")` across operators, comprehensions, helpers, and core combinators. Numeric division by zero is also a stable SDA failure: `Fail(t_sda_div_by_zero, "division by zero")`. Unbound names, bad call arity, and not-callable invocation are now stable SDA failures as well: `t_sda_unbound_name`, `t_sda_arity_mismatch`, and `t_sda_not_callable`. Parse-time/static conditions remain parse diagnostics, with stable tags now covering reserved placeholder misuse and invalid standalone keyed-literal entries, and unsupported generator bindings now reporting an explicit generator-shape diagnostic instead of a generic `|` expectation.
 
 ## CLI And Tooling
 
 - [x] Replace the ad hoc positional CLI with the intended command surface (`eval`, `check`, `fmt` at minimum).
 - [x] Add fixture-driven CLI tests that exercise stdin, file input, stdout, and failure exits.
 - [x] Add a formatter or canonical pretty-printer plan for SDA source.
+- [x] Add formatter enforcement modes for CI/editor workflows (`sda fmt --check`, `sda fmt --write`).
 - [ ] Decide whether `cargo sda-run` remains a developer alias only or becomes part of documented workflow.
 
 Decision note:
-`fmt` now exists as a parse-validating pass-through stub. It closes the CLI surface contract without yet claiming a canonical reformatter.
+`fmt` now parses and emits canonical SDA source using the core AST formatter. It is intentionally conservative and deterministic rather than layout-rich, supports `--check` and `--write` for CI/editor workflows, and can also read source from stdin with optional `--stdin-filepath` metadata for editor integrations.
 
 ## Conformance Harness
 

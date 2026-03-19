@@ -24,8 +24,8 @@ enum Command {
     Eval(EvalArgs),
     /// Parse and validate SDA source without evaluating it.
     Check(SourceArgs),
-    /// Validate SDA source and emit the current formatter stub output.
-    Fmt(SourceArgs),
+    /// Parse, validate, and emit canonical SDA source.
+    Fmt(FmtArgs),
 }
 
 #[derive(Args)]
@@ -60,6 +60,24 @@ struct EvalArgs {
     /// Emit compact JSON instead of pretty JSON.
     #[arg(long)]
     compact: bool,
+}
+
+#[derive(Args)]
+struct FmtArgs {
+    #[command(flatten)]
+    source: SourceArgs,
+
+    /// Optional original path when formatting source from stdin.
+    #[arg(long = "stdin-filepath")]
+    stdin_filepath: Option<std::path::PathBuf>,
+
+    /// Exit nonzero if the source is not already canonical.
+    #[arg(long, conflicts_with = "write")]
+    check: bool,
+
+    /// Rewrite the source file in place using canonical formatting.
+    #[arg(long, requires = "file", conflicts_with = "check")]
+    write: bool,
 }
 
 fn main() {
@@ -108,13 +126,65 @@ fn check_command(args: SourceArgs) {
     println!("ok");
 }
 
-fn fmt_command(args: SourceArgs) {
-    let source = read_source(args.expr, args.file);
-    sda_core::check(&source).unwrap_or_else(|error| {
+fn fmt_command(args: FmtArgs) {
+    let file_path = args.source.file.clone();
+    let source = read_fmt_source(args.source.expr.clone(), args.source.file.clone(), args.stdin_filepath.clone());
+    let formatted = sda_core::format_source(&source).unwrap_or_else(|error| {
         eprintln!("Error: {error}");
         std::process::exit(1);
     });
-    println!("{}", source.trim());
+
+    if args.check {
+        if source.trim_end_matches(['\n', '\r']) == formatted.trim_end_matches(['\n', '\r']) {
+            return;
+        }
+        eprintln!("Error: source is not canonically formatted");
+        std::process::exit(1);
+    }
+
+    if args.write {
+        let path = file_path.expect("clap enforces --write requires --file");
+        std::fs::write(&path, formatted).unwrap_or_else(|error| {
+            eprintln!("Error: failed to write source file: {error}");
+            std::process::exit(1);
+        });
+        return;
+    }
+
+    print!("{formatted}");
+}
+
+fn read_fmt_source(
+    expr: Option<String>,
+    file: Option<std::path::PathBuf>,
+    stdin_filepath: Option<std::path::PathBuf>,
+) -> String {
+    if let Some(expr) = expr {
+        return expr;
+    }
+
+    if let Some(path) = file {
+        return std::fs::read_to_string(path).unwrap_or_else(|error| {
+            eprintln!("Error: failed to read source file: {error}");
+            std::process::exit(1);
+        });
+    }
+
+    let _ = stdin_filepath;
+
+    if std::io::stdin().is_terminal() {
+        eprintln!("Error: provide `-e/--expr`, `-f/--file`, or pipe source on stdin.");
+        std::process::exit(2);
+    }
+
+    let mut buffer = String::new();
+    std::io::stdin()
+        .read_to_string(&mut buffer)
+        .unwrap_or_else(|error| {
+            eprintln!("Error: failed to read stdin: {error}");
+            std::process::exit(1);
+        });
+    buffer
 }
 
 fn read_source(expr: Option<String>, file: Option<std::path::PathBuf>) -> String {
@@ -133,18 +203,27 @@ fn read_source(expr: Option<String>, file: Option<std::path::PathBuf>) -> String
 
 fn read_input_json(path: Option<std::path::PathBuf>, default_null_if_tty: bool) -> serde_json::Value {
     let input_str = if let Some(path) = path {
-        std::fs::read_to_string(path).expect("Failed to read file")
+        std::fs::read_to_string(path).unwrap_or_else(|error| {
+            eprintln!("Error: failed to read input JSON: {error}");
+            std::process::exit(1);
+        })
     } else if default_null_if_tty && std::io::stdin().is_terminal() {
         "null".to_string()
     } else {
         let mut buffer = String::new();
         std::io::stdin()
             .read_to_string(&mut buffer)
-            .expect("Failed to read stdin");
+            .unwrap_or_else(|error| {
+                eprintln!("Error: failed to read stdin: {error}");
+                std::process::exit(1);
+            });
         buffer
     };
 
-    serde_json::from_str(&input_str).unwrap_or(serde_json::Value::Null)
+    serde_json::from_str(&input_str).unwrap_or_else(|error| {
+        eprintln!("Error: invalid input JSON: {error}");
+        std::process::exit(1);
+    })
 }
 
 fn print_json(value: &serde_json::Value, compact: bool) {
