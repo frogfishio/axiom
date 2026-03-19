@@ -60,10 +60,10 @@ Standalone SDA now treats wrong-shape semantic misuse as SDA `Fail(t_sda_wrong_s
 - [x] Add fixture-driven CLI tests that exercise stdin, file input, stdout, and failure exits.
 - [x] Add a formatter or canonical pretty-printer plan for SDA source.
 - [x] Add formatter enforcement modes for CI/editor workflows (`sda fmt --check`, `sda fmt --write`).
-- [ ] Decide whether `cargo sda-run` remains a developer alias only or becomes part of documented workflow.
+- [x] Decide whether `cargo sda-run` remains a developer alias only or becomes part of documented workflow.
 
 Decision note:
-`fmt` now parses and emits canonical SDA source using the core AST formatter. It is intentionally conservative and deterministic rather than layout-rich, supports `--check` and `--write` for CI/editor workflows, and can also read source from stdin with optional `--stdin-filepath` metadata for editor integrations.
+`fmt` now parses and emits canonical SDA source using the core AST formatter. It is intentionally conservative and deterministic rather than layout-rich, supports `--check` and `--write` for CI/editor workflows, and can also read source from stdin with optional `--stdin-filepath` metadata for editor integrations. `cargo sda-run` remains a developer-only Cargo alias; the shipped surface is the `sda` binary, and public documentation should be written in terms of that binary rather than the alias.
 
 ## Conformance Harness
 

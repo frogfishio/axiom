@@ -23,6 +23,8 @@ cargo sda-test
 cargo sda-run -- '1 + 2'
 ```
 
+These aliases are developer conveniences only. The shipped/public command surface is the `sda` binary; examples intended for users or external documentation should use `sda ...`, not `cargo sda-run`.
+
 ## Current structure
 
 - `SDA/`: language specification, notes, examples, grammar materials
