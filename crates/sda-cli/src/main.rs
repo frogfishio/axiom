@@ -1,9 +1,32 @@
-use clap::{Args, Parser, Subcommand};
+use clap::{ArgAction, Args, Parser, Subcommand};
 use std::io::{IsTerminal, Read};
 
+const APP_VERSION: &str = concat!(env!("AXIOM_VERSION"), "-build ", env!("AXIOM_BUILD"));
+const CLI_ABOUT: &str = "Structured Data Algebra command-line interface";
+const CLI_LONG_ABOUT: &str = "Structured Data Algebra command-line interface\n\nEvaluate, validate, and format standalone SDA programs against JSON input.\n\nThe shipped surface is the `sda` binary: use `sda eval` to run filters, `sda check` to validate source, and `sda fmt` to emit canonical SDA source for editor and CI workflows.";
+const CLI_AFTER_HELP: &str = "Examples:\n  sda eval -e 'values(input)' < event.json\n  sda eval -f extract.sda -i event.json --compact\n  sda check -f extract.sda\n  sda fmt -f extract.sda --check\n  sda fmt --stdin-filepath extract.sda < extract.sda\n  sda --license";
+const LICENSE_TEXT: &str = "Copyright (R) Alexander R. Croft\nGPL-3-or-later\n\nThis program is offered under GPL-3-or-later. See the repository licensing materials for the full terms.";
+
 #[derive(Parser)]
-#[command(name = "sda", about = "Structured Data Algebra evaluator")]
+#[command(
+    name = "sda",
+    version = APP_VERSION,
+    about = CLI_ABOUT,
+    long_about = CLI_LONG_ABOUT,
+    after_help = CLI_AFTER_HELP,
+    disable_help_subcommand = true,
+    disable_version_flag = true,
+    next_line_help = true,
+)]
 struct Cli {
+    /// Print the shipped semantic version and build number.
+    #[arg(long = "version", global = true, action = ArgAction::SetTrue)]
+    version_flag: bool,
+
+    /// Print copyright and license information.
+    #[arg(long, global = true, action = ArgAction::SetTrue)]
+    license: bool,
+
     #[command(subcommand)]
     command: Option<Command>,
 
@@ -29,6 +52,7 @@ enum Command {
 }
 
 #[derive(Args)]
+#[command(next_line_help = true)]
 struct SourceArgs {
     /// Inline SDA expression.
     #[arg(short = 'e', long = "expr", conflicts_with = "file")]
@@ -40,6 +64,7 @@ struct SourceArgs {
 }
 
 #[derive(Args)]
+#[command(next_line_help = true, after_help = "Examples:\n  sda eval -e 'values(input)' < event.json\n  sda eval -f extract.sda -i event.json --compact\n  sda eval -e 'root<\"name\">!' --bind root < event.json")]
 struct EvalArgs {
     /// Inline SDA expression.
     #[arg(short = 'e', long = "expr", conflicts_with = "file")]
@@ -63,6 +88,7 @@ struct EvalArgs {
 }
 
 #[derive(Args)]
+#[command(next_line_help = true, after_help = "Examples:\n  sda fmt -f extract.sda\n  sda fmt -f extract.sda --check\n  sda fmt -f extract.sda --write\n  sda fmt --stdin-filepath extract.sda < extract.sda")]
 struct FmtArgs {
     #[command(flatten)]
     source: SourceArgs,
@@ -82,6 +108,16 @@ struct FmtArgs {
 
 fn main() {
     let cli = Cli::parse();
+
+    if cli.version_flag {
+        println!("{APP_VERSION}");
+        return;
+    }
+
+    if cli.license {
+        println!("{LICENSE_TEXT}");
+        return;
+    }
 
     match cli.command {
         Some(Command::Eval(args)) => eval_command(args),

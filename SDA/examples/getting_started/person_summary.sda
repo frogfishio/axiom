@@ -1,0 +1,7 @@
+bindRes(
+  input<"name">!,
+  name => bindRes(
+    input<"city">!,
+    city => Ok(Map{"person" -> name, "location" -> city})
+  )
+)

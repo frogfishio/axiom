@@ -95,6 +95,8 @@ Not every tool needs every flag in v0, but the family should feel consistent.
 sda eval -f extract.sda < event.json
 sda eval -e 'Map{ "x" -> 1 }' < input.json
 sda check -f extract.sda
+sda --version
+sda --license
 sda fmt -f extract.sda
 sda fmt --stdin-filepath extract.sda < extract.sda
 sda fmt -f extract.sda --check
@@ -105,6 +107,8 @@ sda fmt -f extract.sda --write
 
 - `eval`: run a program
 - `check`: parse and validate
+- `--version`: print the shipped semantic version and build number
+- `--license`: print copyright and license notice
 - `fmt`: parse, validate, emit canonical SDA source, read from stdin for editor integrations, or enforce it with `--check` / `--write`
 
 ### Example

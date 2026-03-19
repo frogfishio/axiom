@@ -15,6 +15,53 @@ fn unique_temp_path(name: &str) -> PathBuf {
     std::env::temp_dir().join(format!("axiom-sda-{name}-{}-{nanos}", std::process::id()))
 }
 
+fn repo_root() -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .expect("workspace crates dir")
+        .parent()
+        .expect("workspace root")
+        .to_path_buf()
+}
+
+fn expected_version_string() -> String {
+    let root = repo_root();
+    let version = fs::read_to_string(root.join("VERSION")).expect("read VERSION");
+    let build = fs::read_to_string(root.join("BUILD")).expect("read BUILD");
+    format!("{}-build {}\n", version.trim(), build.trim())
+}
+
+#[test]
+fn version_reports_root_version_and_build() {
+    let output = sda_bin().arg("--version").output().expect("run sda --version");
+
+    assert!(output.status.success(), "stderr: {}", String::from_utf8_lossy(&output.stderr));
+    assert_eq!(String::from_utf8_lossy(&output.stdout), expected_version_string());
+}
+
+#[test]
+fn license_prints_notice() {
+    let output = sda_bin().arg("--license").output().expect("run sda --license");
+
+    assert!(output.status.success(), "stderr: {}", String::from_utf8_lossy(&output.stderr));
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("Alexander R. Croft"));
+    assert!(stdout.contains("GPL-3-or-later"));
+}
+
+#[test]
+fn help_mentions_core_workflows() {
+    let output = sda_bin().arg("--help").output().expect("run sda --help");
+
+    assert!(output.status.success(), "stderr: {}", String::from_utf8_lossy(&output.stderr));
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("Structured Data Algebra command-line interface"));
+    assert!(stdout.contains("sda eval -e 'values(input)' < event.json"));
+    assert!(stdout.contains("--license"));
+    assert!(stdout.contains("--version"));
+    assert!(stdout.contains("sda fmt --stdin-filepath extract.sda < extract.sda"));
+}
+
 #[test]
 fn eval_reads_stdin_json() {
     let mut child = sda_bin()
