@@ -2,7 +2,7 @@
 
 Fail(code,msg) must use stable codes and stable short English messages.
 
-SDA-core:
+SDA standalone runtime:
 - t_sda_wrong_shape "wrong shape"
 - t_sda_missing_key "missing key"
 - t_sda_duplicate_key "duplicate key"

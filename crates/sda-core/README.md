@@ -4,6 +4,8 @@
 
 It provides a small host-facing API for parsing, validating, formatting, and evaluating standalone SDA programs over JSON values.
 
+The library is intended for host applications that want SDA semantics without shelling out to the CLI. It keeps evaluation pure and leaves file IO, process control, and orchestration to the caller.
+
 ## Install
 
 ```toml
@@ -20,6 +22,8 @@ assert_eq!(output, serde_json::json!({"$type": "ok", "$value": "Ada"}));
 # Ok::<(), sda_lib::SdaError>(())
 ```
 
+If you want to bind host input under a name other than `input`, use `run_with_input_binding`.
+
 ## API Surface
 
 - `run`: evaluate an SDA program against JSON bound as `input`
@@ -31,6 +35,11 @@ assert_eq!(output, serde_json::json!({"$type": "ok", "$value": "Ada"}));
 ## Documentation
 
 - Repository: https://github.com/frogfishio/axiom
+- docs.rs crate docs: https://docs.rs/sda-lib
 - Formal specification: https://github.com/frogfishio/axiom/blob/main/SDA/SDA_SPEC.md
 - User manual: https://github.com/frogfishio/axiom/blob/main/SDA/USER_MANUAL.md
 - jq guide: https://github.com/frogfishio/axiom/blob/main/SDA/FOR_JQ_USERS.md
+
+## CLI
+
+If you want the Unix-facing tool instead of the embedded library, install the `sda` crate.

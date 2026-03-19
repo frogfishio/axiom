@@ -11,7 +11,7 @@ Spec note:
 ## Migration
 
 - [ ] Remove the legacy nested Rust workspace under `SDA/sda` after the top-level port is stable.
-- [ ] Update top-level documentation to point contributors at `crates/sda-core` and `crates/sda-cli`.
+- [x] Update top-level documentation to point contributors at the top-level implementation crates and the published `sda-lib` / `sda` package names.
 - [ ] Add regression tests that prove the top-level crates are the only supported implementation path.
 
 ## Determinism And Canonical Semantics

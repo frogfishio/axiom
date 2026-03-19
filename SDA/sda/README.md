@@ -4,8 +4,8 @@ The active SDA implementation no longer lives in this nested workspace.
 
 Use the top-level crates instead:
 
-- `crates/sda-core`
-- `crates/sda-cli`
+- `crates/sda-core` for the published `sda-lib` Rust library
+- `crates/sda-cli` for the published `sda` command-line crate
 
 This directory remains under `SDA/` only as part of the specification area. The implementation backlog is tracked in `GAPS.md`, and development commands are documented in `DEVELOPMENT.md`.
                  | NOT Not ;

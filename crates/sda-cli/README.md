@@ -4,6 +4,8 @@
 
 It evaluates SDA programs over JSON input, validates source without executing it, and emits canonical SDA formatting for editor and CI workflows.
 
+SDA is a deterministic language for structured-data reduction. The CLI is intended for shell use, CI checks, ETL glue, fixture replay, and jq-like JSON reshaping where exact semantics matter.
+
 ## Install
 
 ```sh
@@ -14,8 +16,16 @@ cargo install sda
 
 ```sh
 sda eval -e 'values(input)' < event.json
+sda eval -f extract.sda -i event.json --compact
 sda check -f extract.sda
 sda fmt -f extract.sda --check
+sda fmt -f extract.sda --write
+```
+
+## Install From Source
+
+```sh
+cargo install --path crates/sda-cli
 ```
 
 ## What SDA Is For
@@ -25,9 +35,17 @@ sda fmt -f extract.sda --check
 - explicit success and failure values
 - stable formatting and validation in automation
 
+## Exit Behavior
+
+- successful evaluation prints JSON to stdout
+- validation and formatting failures exit nonzero with a readable error
+- `check` prints `ok` on success
+- `fmt --check` exits nonzero when source is not canonical
+
 ## Documentation
 
 - Repository: https://github.com/frogfishio/axiom
+- docs.rs package page: https://docs.rs/sda
 - User manual: https://github.com/frogfishio/axiom/blob/main/SDA/USER_MANUAL.md
 - Cheat sheet: https://github.com/frogfishio/axiom/blob/main/SDA/CHEATSHEET.md
 - jq guide: https://github.com/frogfishio/axiom/blob/main/SDA/FOR_JQ_USERS.md
