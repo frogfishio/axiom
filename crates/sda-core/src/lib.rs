@@ -566,6 +566,34 @@ mod tests {
     }
 
     #[test]
+    fn test_unbound_name_is_stable() {
+        assert_eq!(
+            r("missing;"),
+            serde_json::json!({"$type": "fail", "$code": "t_sda_unbound_name", "$msg": "unbound name"})
+        );
+    }
+
+    #[test]
+    fn test_not_callable_is_stable() {
+        assert_eq!(
+            r("1(2);"),
+            serde_json::json!({"$type": "fail", "$code": "t_sda_not_callable", "$msg": "not callable"})
+        );
+    }
+
+    #[test]
+    fn test_arity_mismatch_is_stable() {
+        assert_eq!(
+            r("(x => x)(1, 2);"),
+            serde_json::json!({"$type": "fail", "$code": "t_sda_arity_mismatch", "$msg": "arity mismatch"})
+        );
+        assert_eq!(
+            r("normalizeUnique();"),
+            serde_json::json!({"$type": "fail", "$code": "t_sda_arity_mismatch", "$msg": "arity mismatch"})
+        );
+    }
+
+    #[test]
     fn test_custom_input_binding_name() {
         let result = rib(r#"root<"name">!;"#, "root", serde_json::json!({"name": "Ada"}));
         assert_eq!(result, serde_json::json!({"$type": "ok", "$value": "Ada"}));
@@ -612,6 +640,30 @@ mod tests {
     fn test_bytes_literal_rejects_invalid_hex() {
         let err = run(r#"Bytes("0fg");"#, serde_json::Value::Null).unwrap_err();
         assert!(matches!(err, SdaError::Parse(ParseError::InvalidBytesLiteral { .. })));
+    }
+
+    #[test]
+    fn test_reserved_placeholder_in_let_is_stable_parse_error() {
+        let err = run("let _ = 1;", serde_json::Value::Null).unwrap_err();
+        assert!(matches!(err, SdaError::Parse(ParseError::ReservedPlaceholder)));
+    }
+
+    #[test]
+    fn test_reserved_placeholder_as_lambda_param_is_stable_parse_error() {
+        let err = run("_ => 1;", serde_json::Value::Null).unwrap_err();
+        assert!(matches!(err, SdaError::Parse(ParseError::ReservedPlaceholder)));
+    }
+
+    #[test]
+    fn test_invalid_map_key_is_stable_parse_error() {
+        let err = run(r#"Map{a -> 1};"#, serde_json::Value::Null).unwrap_err();
+        assert!(matches!(err, SdaError::Parse(ParseError::InvalidMapKey)));
+    }
+
+    #[test]
+    fn test_invalid_bagkv_key_is_stable_parse_error() {
+        let err = run(r#"BagKV{1 -> 1};"#, serde_json::Value::Null).unwrap_err();
+        assert!(matches!(err, SdaError::Parse(ParseError::InvalidBagkvKey)));
     }
 
     #[test]

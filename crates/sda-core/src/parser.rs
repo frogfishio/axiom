@@ -12,6 +12,12 @@ pub enum ParseError {
     SelectorNotStatic,
     #[error("t_sda_duplicate_label_in_selector: duplicate label")]
     DuplicateLabelInSelector,
+    #[error("t_sda_reserved_placeholder: reserved placeholder")]
+    ReservedPlaceholder,
+    #[error("t_sda_invalid_map_key: invalid map key")]
+    InvalidMapKey,
+    #[error("t_sda_invalid_bagkv_key: invalid bagkv key")]
+    InvalidBagkvKey,
     #[error("Invalid bytes literal '{literal}' at position {pos}: {reason}")]
     InvalidBytesLiteral { literal: String, pos: usize, reason: String },
     #[error("Unexpected end of input")]
@@ -85,6 +91,9 @@ impl Parser {
     fn parse_stmt(&mut self) -> Result<Stmt, ParseError> {
         if *self.peek() == TokenKind::Let {
             self.advance();
+            if *self.peek() == TokenKind::Placeholder {
+                return Err(ParseError::ReservedPlaceholder);
+            }
             let name = self.expect_ident()?;
             self.expect(TokenKind::Eq)?;
             let expr = self.parse_expr()?;
@@ -371,6 +380,9 @@ impl Parser {
                 Ok(Expr::Bytes(bytes))
             }
             TokenKind::Placeholder => {
+                if *self.peek_next() == TokenKind::FatArrow {
+                    return Err(ParseError::ReservedPlaceholder);
+                }
                 self.advance();
                 Ok(Expr::Placeholder)
             }
@@ -599,10 +611,7 @@ impl Parser {
                 self.advance();
                 s
             }
-            token => {
-                let pos = self.peek_pos();
-                return Err(ParseError::Expected("string literal map key".to_string(), token, pos));
-            }
+            _ => return Err(ParseError::InvalidMapKey),
         };
         self.expect(TokenKind::Arrow)?;
         let value = self.parse_expr()?;
@@ -619,10 +628,7 @@ impl Parser {
                 self.advance();
                 name
             }
-            token => {
-                let pos = self.peek_pos();
-                return Err(ParseError::Expected("bagkv key".to_string(), token, pos));
-            }
+            _ => return Err(ParseError::InvalidBagkvKey),
         };
         self.expect(TokenKind::Arrow)?;
         let value = self.parse_expr()?;

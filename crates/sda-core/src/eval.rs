@@ -33,6 +33,18 @@ fn div_by_zero_value() -> Value {
     fail_value("t_sda_div_by_zero", "division by zero")
 }
 
+fn unbound_name_value() -> Value {
+    fail_value("t_sda_unbound_name", "unbound name")
+}
+
+fn not_callable_value() -> Value {
+    fail_value("t_sda_not_callable", "not callable")
+}
+
+fn arity_mismatch_value() -> Value {
+    fail_value("t_sda_arity_mismatch", "arity mismatch")
+}
+
 pub(crate) fn ensure_comparable(value: &Value) -> Result<(), EvalError> {
     match value {
         Value::Null
@@ -92,7 +104,7 @@ pub fn eval_expr(expr: &Expr, env: &Env) -> Result<Value, EvalError> {
         Expr::Ident(name) => env
             .get(name)
             .cloned()
-            .ok_or_else(|| EvalError::UnboundVar(name.clone())),
+            .map_or_else(|| Ok(unbound_name_value()), Ok),
         Expr::Seq(items) => {
             let values: Result<Vec<Value>, EvalError> =
                 items.iter().map(|item| eval_expr(item, env)).collect();
@@ -165,12 +177,16 @@ pub fn eval_expr(expr: &Expr, env: &Env) -> Result<Value, EvalError> {
 
             if let Expr::Ident(name) = func_expr.as_ref() {
                 if let Some(result) = stdlib::call_stdlib(name, arg_vals.clone()) {
-                    return result;
+                    return match result {
+                        Err(EvalError::ArityMismatch { .. }) => Ok(arity_mismatch_value()),
+                        other => other,
+                    };
                 }
-                let func = env
-                    .get(name)
-                    .cloned()
-                    .ok_or_else(|| EvalError::UnboundVar(name.clone()))?;
+                let func = if let Some(func) = env.get(name).cloned() {
+                    func
+                } else {
+                    return Ok(unbound_name_value());
+                };
                 return apply_lambda(func, arg_vals);
             }
 
@@ -562,16 +578,13 @@ pub(crate) fn apply_lambda(func: Value, args: Vec<Value>) -> Result<Value, EvalE
     match func {
         Value::Lambda(param, body, captured_env) => {
             if args.len() != 1 {
-                return Err(EvalError::ArityMismatch {
-                    expected: 1,
-                    got: args.len(),
-                });
+                return Ok(arity_mismatch_value());
             }
             let mut new_env = *captured_env;
             new_env.insert(param, args.into_iter().next().unwrap());
             eval_expr(&body, &new_env)
         }
-        other => Err(EvalError::NotCallable(format!("{other:?}"))),
+        _ => Ok(not_callable_value()),
     }
 }
 

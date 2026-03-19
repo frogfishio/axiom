@@ -52,7 +52,7 @@ Decision note:
 - [x] Add conformance tests for all stable error codes and message strings.
 
 Decision note:
-Standalone SDA now treats wrong-shape semantic misuse as SDA `Fail(t_sda_wrong_shape, "wrong shape")` across operators, comprehensions, helpers, and core combinators. Numeric division by zero is also a stable SDA failure: `Fail(t_sda_div_by_zero, "division by zero")`. Parse-time/static conditions remain parse diagnostics. Invocation-level concerns such as unbound names, bad call arity, and not-callable values remain host/profile diagnostics for now.
+Standalone SDA now treats wrong-shape semantic misuse as SDA `Fail(t_sda_wrong_shape, "wrong shape")` across operators, comprehensions, helpers, and core combinators. Numeric division by zero is also a stable SDA failure: `Fail(t_sda_div_by_zero, "division by zero")`. Unbound names, bad call arity, and not-callable invocation are now stable SDA failures as well: `t_sda_unbound_name`, `t_sda_arity_mismatch`, and `t_sda_not_callable`. Parse-time/static conditions remain parse diagnostics, with stable tags now covering reserved placeholder misuse and invalid standalone keyed-literal entries.
 
 ## CLI And Tooling
 
@@ -74,7 +74,7 @@ Decision note:
 - [x] Add conformance coverage for standalone membership on `Seq`, `Map`, and `Prod`.
 - [x] Add conformance coverage for standalone helper misuse and success cases (`typeOf`, `keys`, `values`, `count`).
 - [x] Add regression tests that replay the worked examples in `SDA/SDA_SPEC.md`.
-- [ ] Add regression tests proving the standalone profile's explicit choices:
+- [x] Add regression tests proving the standalone profile's explicit choices:
 	- no implicit pipe argument insertion
 	- no required general `k -> v` expression sugar
 - [ ] Add regression coverage for every gap closed from this file.

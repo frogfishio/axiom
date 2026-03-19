@@ -73,15 +73,7 @@ The clarified spec now distinguishes:
 - core SDA semantic failures
 - profile / invocation diagnostics
 
-The implementation still exposes many dynamic conditions as host-side `EvalError` values instead of SDA-level `Fail(code, msg)` results or a clearly separate invocation boundary.
-
-Examples include:
-
-- `UnboundVar`
-- `NotCallable`
-- `ArityMismatch`
-
-The main remaining ambiguity is now narrower than before.
+The implementation no longer leaks the main standalone invocation failures as host-side `EvalError` values.
 
 Required decision:
 
@@ -92,12 +84,11 @@ Status update:
 
 - wrong-shape semantic misuse has now been normalized to `Fail(t_sda_wrong_shape, ...)`
 - division by zero has now been normalized to `Fail(t_sda_div_by_zero, ...)`
+- unbound names now normalize to `Fail(t_sda_unbound_name, ...)`
+- non-callable invocation now normalizes to `Fail(t_sda_not_callable, ...)`
+- arity mismatch now normalizes to `Fail(t_sda_arity_mismatch, ...)`
 
-The remaining open invocation/profile boundary is now mostly about:
-
-- unbound names
-- not-callable values
-- arity mismatch
+The remaining open profile boundary is now mostly outside the core evaluator itself: CLI/runtime invocation faults and any future host-installed extensions.
 
 ### 2. Conformance Coverage Is Too Small For The Real Contract
 
@@ -117,14 +108,13 @@ The main remaining proof gaps are parser-boundary regressions and CLI black-box 
 
 ### 3. Standalone Grammar And Parser Still Differ On A Few Boundary Conditions
 
-The spec now defines the standalone position more clearly, but the parser still leaves some conditions to generic parse failures rather than stable tagged conditions or explicit profile rules.
+The spec now defines the standalone position more clearly, and the parser now covers several important boundary conditions with stable tags, but some conditions still fall back to generic parse failures.
 
 Important examples:
 
 - unsupported comprehension shapes
 - invalid selector-like constructs
-- invalid map or bagkv entry usage
-- invocation of reserved placeholder in declaration-like positions
+- other standalone profile restrictions not yet given explicit stable tags
 
 This is not a correctness disaster, but it is still weaker than the clarified spec posture.
 
@@ -133,14 +123,14 @@ This is not a correctness disaster, but it is still weaker than the clarified sp
 The standalone helpers and core combinators now mostly implement the right success semantics, and wrong-shape behavior is substantially more consistent.
 
 Wrong-shape misuse now resolves to SDA `Fail(...)` values across the main standalone surface.
-Remaining host-side issues are mostly invocation-level, especially arity and callability.
+Remaining host-side issues are mostly outside the core evaluator now.
 
 This inconsistency matters because helpers are now explicitly divided between:
 
 - core combinators
 - standalone profile helpers
 
-The repository still needs one final explicit rule for invocation misuse across all callable forms.
+That callable-boundary rule is now explicit in the runtime and spec for the standalone surface.
 
 ### 5. Spec Examples Are Now Sharper Than The Tests
 
@@ -154,32 +144,23 @@ That creates a regression risk:
 
 ## Prioritized Worklist
 
-### Priority 1: Close The Remaining Invocation Boundary
+### Priority 1: Tighten Remaining Parser Boundaries
 
-1. Decide the final taxonomy for dynamic misuse:
-   - SDA `Fail(code, msg)`
-   - parse/static rejection
-   - profile/invocation diagnostics
+1. Decide whether any additional parse-time standalone restrictions deserve stable tags.
 
-2. Apply that remaining rule consistently across:
-   - lambda application
-   - named callable lookup
-   - CLI/runtime invocation boundaries
+2. Apply that rule consistently across remaining unsupported comprehension or selector-edge forms.
 
-3. Update conformance tests so the chosen boundary is provable.
+3. Update conformance tests so the chosen parse boundary is provable.
 
-### Priority 2: Tighten Diagnostics And CLI Coverage
+### Priority 2: Tighten CLI Coverage
 
-4. Improve parser diagnostics where standalone restrictions matter materially.
-5. Add CLI black-box tests for `eval`, `check`, and `fmt`.
+4. Add broader CLI black-box tests for mixed success/failure cases.
 
 ### Priority 3: Keep The Spec Executable
 
-6. Decide whether any additional stable parse-time tags are needed or whether generic parse diagnostics remain sufficient outside the current tagged cases.
-
-7. Add regression tests that prove the standalone profile rejects or avoids the old ambiguous readings:
-    - no implicit pipe application
-    - no required general `k -> v` expression sugar
+5. Keep the explicit-choice regressions in place:
+   - no implicit pipe application
+   - no required general `k -> v` expression sugar
 
 ## Recommended Implementation Order
 

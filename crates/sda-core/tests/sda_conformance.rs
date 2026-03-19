@@ -35,17 +35,6 @@ fn assert_parse_error(expr: &str, expected_code: &str, expected_msg: &str) {
     }
 }
 
-fn assert_eval_error(expr: &str, expected_msg: &str) {
-    let err = run(expr, serde_json::Value::Null).expect_err("expected eval error");
-    match err {
-        SdaError::Eval(eval_err) => {
-            let rendered = eval_err.to_string();
-            assert!(rendered.contains(expected_msg), "missing msg in error: {rendered}");
-        }
-        other => panic!("expected eval error, got {other:?}"),
-    }
-}
-
 mod section_6_eliminators {
     use super::*;
 
@@ -375,7 +364,7 @@ mod section_10_pipe {
 
     #[test]
     fn pipe_does_not_insert_implicit_argument() {
-        assert_eval_error(r#"BagKV{"k" -> 1} |> normalizeUnique();"#, "Arity mismatch");
+        assert_fail(r#"BagKV{"k" -> 1} |> normalizeUnique();"#, "t_sda_arity_mismatch", "arity mismatch");
     }
 }
 
@@ -492,5 +481,53 @@ mod section_12_static_selector_errors {
     #[test]
     fn duplicate_label_tag_is_stable() {
         assert_parse_error("{a a};", "t_sda_duplicate_label_in_selector", "duplicate label");
+    }
+
+    #[test]
+    fn reserved_placeholder_in_let_is_stable() {
+        assert_parse_error("let _ = 1;", "t_sda_reserved_placeholder", "reserved placeholder");
+    }
+
+    #[test]
+    fn reserved_placeholder_as_lambda_param_is_stable() {
+        assert_parse_error("_ => 1;", "t_sda_reserved_placeholder", "reserved placeholder");
+    }
+
+    #[test]
+    fn invalid_map_key_tag_is_stable() {
+        assert_parse_error("Map{a -> 1};", "t_sda_invalid_map_key", "invalid map key");
+    }
+
+    #[test]
+    fn invalid_bagkv_key_tag_is_stable() {
+        assert_parse_error("BagKV{1 -> 1};", "t_sda_invalid_bagkv_key", "invalid bagkv key");
+    }
+
+    #[test]
+    fn general_bind_sugar_is_not_required_in_standalone() {
+        assert_parse_error(
+            r#"{ yield "x" -> 1 | a in Seq[1] };"#,
+            "Expected",
+            "Arrow",
+        );
+    }
+}
+
+mod section_12_invocation_failures {
+    use super::*;
+
+    #[test]
+    fn unbound_name_is_stable() {
+        assert_fail("missing;", "t_sda_unbound_name", "unbound name");
+    }
+
+    #[test]
+    fn not_callable_is_stable() {
+        assert_fail("1(2);", "t_sda_not_callable", "not callable");
+    }
+
+    #[test]
+    fn lambda_arity_mismatch_is_stable() {
+        assert_fail("(x => x)(1, 2);", "t_sda_arity_mismatch", "arity mismatch");
     }
 }

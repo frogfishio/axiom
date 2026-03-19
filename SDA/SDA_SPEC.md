@@ -260,6 +260,16 @@ SDA supports minimal lambda expressions for use with combinators.
 - The bound variable is scoped within the lambda body.
 - Lambdas are primarily intended for use with combinators such as `mapRes`, `bindRes`, `mapOpt`, `bindOpt`.
 
+### 2.3 Identifier and call semantics
+
+- A bare identifier denotes the value bound to that name in the current environment.
+- If no such binding exists, evaluation yields `Fail(t_sda_unbound_name, "unbound name")`.
+- A call expression evaluates its callee and arguments explicitly.
+- If the evaluated callee is not callable, evaluation yields `Fail(t_sda_not_callable, "not callable")`.
+- In standalone SDA v1, lambdas are single-parameter callables.
+- If a callable is invoked with the wrong number of arguments, evaluation yields `Fail(t_sda_arity_mismatch, "arity mismatch")`.
+- Hosts may install additional callable names, but they must preserve the same call boundary semantics.
+
 ---
 
 ## 3. Carriers (Seq / Set / Bag / Map / Prod)
@@ -942,10 +952,16 @@ These codes are stable and MUST be used by conforming implementations.
 
 - `t_sda_wrong_shape`
 - `t_sda_div_by_zero`
+- `t_sda_unbound_name`
+- `t_sda_not_callable`
+- `t_sda_arity_mismatch`
 - `t_sda_missing_key`
 - `t_sda_duplicate_key`
 - `t_sda_selector_not_static`
 - `t_sda_duplicate_label_in_selector`
+- `t_sda_reserved_placeholder`
+- `t_sda_invalid_map_key`
+- `t_sda_invalid_bagkv_key`
 - `t_sda_unknown_field` (compile-time where applicable)
 - `t_sda_unbound_placeholder`
 
@@ -966,6 +982,12 @@ Boundary note:
   part of the standalone profile or host tooling, not the mathematical core.
 - Where this specification names a stable tag for a parse-time or compile-time condition, conformance
   applies to the tag and semantic condition, not to any particular host-specific diagnostic format.
+
+Standalone profile note:
+
+- Reserved placeholder misuse in declaration-like positions uses `t_sda_reserved_placeholder`.
+- Invalid standalone `Map` literal keys use `t_sda_invalid_map_key`.
+- Invalid standalone `BagKV` literal keys use `t_sda_invalid_bagkv_key`.
 
 ---
 
