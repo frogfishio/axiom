@@ -5,6 +5,9 @@ This file tracks the work needed to turn the current SDA seed runtime into the c
 Current note:
 The JSON bridge is now explicit: plain objects decode to `Map` unless they use a reserved SDA wrapper tag, and colliding plain maps are emitted through `{"$type":"map","$entries":{...}}` so wrapper-tag precedence stays deterministic without losing round-tripping.
 
+Spec note:
+`SDA/SDA_SPEC.md` and `SDA/DOCTRINE.md` now define a sharper boundary between the semantic core, the embedding / transformation model, the standalone profile, and outer orchestration. New work should be evaluated against that boundary rather than older, looser assumptions.
+
 ## Migration
 
 - [ ] Remove the legacy nested Rust workspace under `SDA/sda` after the top-level port is stable.
@@ -43,7 +46,8 @@ Decision note:
 ## Errors And Diagnostics
 
 - [x] Implement the remaining stable error tags listed in the SDA spec.
-- [ ] Separate runtime type errors from spec-stable `Fail(code, msg)` results more rigorously.
+- [ ] Freeze the final failure taxonomy across static rejection, SDA `Fail(code, msg)`, and profile / host diagnostics.
+- [ ] Separate runtime type and invocation errors from spec-stable `Fail(code, msg)` results according to that taxonomy.
 - [ ] Improve parser diagnostics around selector ambiguity, invalid map keys, and unsupported comprehension forms.
 - [x] Add conformance tests for all stable error codes and message strings.
 
@@ -59,4 +63,12 @@ Decision note:
 - [x] Build a spec-indexed conformance suite layout separate from implementation unit tests.
 - [x] Add tests for selector semantics on `Map`, `Prod`, and `BagKV` edge cases.
 - [x] Add finite-corpus law tests for set, bag, and map algebra where determinism matters.
+- [ ] Add full spec-indexed conformance coverage for `§9 Comprehensions`.
+- [ ] Add full spec-indexed conformance coverage for `§10 Pipe` beyond unbound-placeholder cases.
+- [ ] Add conformance coverage for standalone membership on `Seq`, `Map`, and `Prod`.
+- [ ] Add conformance coverage for standalone helper misuse and success cases (`typeOf`, `keys`, `values`, `count`).
+- [ ] Add regression tests that replay the worked examples in `SDA/SDA_SPEC.md`.
+- [ ] Add regression tests proving the standalone profile's explicit choices:
+	- no implicit pipe argument insertion
+	- no required general `k -> v` expression sugar
 - [ ] Add regression coverage for every gap closed from this file.

@@ -1,4 +1,4 @@
-# SDA SPEC (standalone)
+# SDA SPEC (core + standalone profile)
 
 SDA = **Structured Data Algebra**.
 
@@ -37,18 +37,31 @@ It is designed to be:
 - **deterministic** (no ambient IO; host provides data + caps)
 - **conformance-testable** (stable errors, stable semantics)
 
-SDA is intended to be embeddable in other languages, but this document specifies
-SDA as a **standalone** language.
+SDA is intended to be embeddable in other languages. This document specifies:
+
+1. the **semantic core** of SDA
+2. the **embedding / transformation model** used when SDA is applied to host values
+3. the **standalone profile** used by the repository's CLI and JSON bridge
+
+It does **not** specify orchestration, external effects, retries, source lookup,
+or workflow policy. Those belong to outer layers such as Axiom, enrichment, and shaping.
 
 ---
 
 ## Section layering doctrine
 
-This specification distinguishes two levels:
+This specification distinguishes three levels inside SDA itself, plus an outer boundary:
 
 1. **Core algebra**: the mathematically closed, pure semantics of SDA.
-2. **Standalone profile / extensions**: surface syntax choices, embedding or host concerns,
-   and convenience features layered on top of the core.
+2. **Embedding / transformation model**: how the pure algebra is supplied with inputs,
+   composed into stages, and consumed by a host while remaining pure.
+3. **Standalone profile / extensions**: surface syntax choices, host-facing helpers,
+   and convenience features layered on top of the core and embedding model.
+
+Outside this document's semantic scope:
+
+4. **Orchestration and effects**: HTTP, file access, retries, source lookup, shaping,
+   and workflow control. These may consume SDA results but do not redefine SDA meaning.
 
 Rule:
 
@@ -69,6 +82,8 @@ Section role guide:
   - §7 Normalization
   - §8 Set / Bag / Seq operators
   - §9 Comprehensions
+  - §10 Pipe operator
+- **Embedding / transformation model**:
   - §10 Pipe operator
 - **Mixed boundary sections**:
   - §11 Functions
@@ -98,13 +113,21 @@ Unless a section is explicitly marked **Informative**, it should be treated as *
 
 SDA is a pure, deterministic transformation language.
 
-- The core semantics has two layers:
-  - **static validity**: whether a program uses only lawful core forms
-  - **evaluation**: the result of running a statically valid program on an input value
-- A statically valid program evaluates to either a **value** or a `Fail(code, msg)`.
-- The only observable result is the final value (including `Ok/Fail` wrappers if present).
+- The core semantics has three layers:
+  - **static validity**: whether a program uses only lawful SDA forms
+  - **core evaluation**: the result of running a statically valid, closed SDA program on an input value
+  - **profile / host invocation**: how a standalone tool or embedding host reports non-core invocation issues
+- A statically valid, closed SDA program evaluates to either a **value** or a `Fail(code, msg)` for SDA-defined failure conditions.
+- The observable result of the **core algebra** is therefore a value, including `Ok/Fail` wrappers when present.
 - There is no ambient IO. Any host interaction is via host-provided input values and host-installed functions.
 - Order is observable only for `Seq`. `Set`, `Bag`, `Map`, and `Prod` are compared extensionally (see §1.2).
+
+Boundary clarification:
+
+- A **core semantic failure** is part of SDA meaning and must preserve the same condition whether detected statically or dynamically.
+- A **profile or invocation diagnostic** is not part of the core algebra unless this specification assigns it a stable SDA tag.
+- Examples of profile or invocation diagnostics may include unsupported host extensions, unavailable host-installed helpers,
+  malformed CLI invocation, or other non-core integration faults.
 
 Core boundary rule:
 
@@ -117,6 +140,9 @@ Core boundary rule:
 - Line comments begin with `;;` and continue to the end of the line.
 - SDA is whitespace-insensitive except where whitespace is required to separate tokens.
 - String literals support at least the following escape sequences: `\"`, `\\`, `\n`, `\t`.
+- In the standalone profile, reserved keywords and built-in constructor names are case-insensitive at the lexical level.
+  Examples: `null`, `Null`, `NULL`, `some`, and `Some` denote the same reserved forms.
+  Hosts MAY choose a stricter surface, but if they do, that stricter rule is a host profile choice rather than core SDA semantics.
 
 ## 0.3 Notation
 
@@ -141,7 +167,7 @@ Core boundary rule:
 
 Conformance note (Normative):
 For the following token pairs, the Unicode and ASCII spellings are exact synonyms and MUST parse to the same AST nodes:
-- `→` and `->` (binding / map entry / BagKV entry sugar)
+- `→` and `->` (map entry / BagKV entry / binding constructor sugar where supported)
 - `↦` and `=>` (lambda)
 No other Unicode/ASCII equivalence is implied by this section unless explicitly listed.
 
@@ -271,7 +297,8 @@ HTTP headers and JSON with duplicate keys.
 SDA defines a first-class binding value:
 
 - `Bind(k, v)` produces a binding from key `k` to value `v`.
-- Surface sugar: `k -> v` desugars to `Bind(k, v)`.
+- In the standalone profile, `k -> v` is guaranteed only in literal entry positions such as `Map{...}` and `BagKV{...}`.
+- A host MAY additionally support `k -> v` as general expression sugar for `Bind(k, v)`, but if it does, that is a documented host extension unless and until the core grammar adopts it explicitly.
 
 Bindings are normal values: they can appear inside `Seq`, `Set`, or `Bag`.
 `BagKV{ ... }` is a bag whose elements are `Bind(k,v)` values.
@@ -302,6 +329,12 @@ Core algebra intent:
 - Literal (standalone form): `Prod{ name: "steve", age: 11 }`
 
 Standalone SDA treats a `Prod{ ... }` literal as introducing a known product shape locally.
+
+Standalone clarification:
+
+- In standalone SDA, `Prod` is a runtime carrier kind with distinct lawful eliminators.
+- The phrase "known shape" means that total projection is defined on `Prod` and undefined on `Map`.
+- This does **not** imply whole-program schema inference, effectful reflection, or host-specific structural typing in the core language.
 
 Hosts may also construct `Prod` values from external schemas or typed embeddings, but they must
 preserve the same core meaning: `Prod` supports total projection; `Map` does not.
@@ -550,8 +583,17 @@ Sequences support:
 ### 8.4 Membership
 
 - `x ∈ Set{...}` is defined.
+- `x ∈ Seq[...]` is defined as positional-carrier membership with a boolean result; order is ignored for the membership test itself.
 - `x ∈ Bag{...}` is defined (ignores multiplicity; presence test).
+- `x ∈ Map{...}` is defined as key membership and therefore requires `x` to denote a key value in the carrier's key domain.
+- `x ∈ Prod{...}` is defined as field-label membership and therefore requires `x` to denote a field label.
 - For multiplicity, hosts may provide `count(x, bag)`.
+
+Standalone note:
+
+- In standalone SDA, `Map` keys are strings and `Prod` field labels are strings, so map or prod membership is a string-label membership test.
+- In standalone SDA, if the left-hand side of map or prod membership is not a string label, the result is `false` rather than a shape failure.
+- Hosts that extend the `Map` key domain must preserve the same carrier-relative meaning.
 
 ### 8.5 Algebraic laws (Informative)
 
@@ -603,13 +645,20 @@ Allow a `yield` clause:
 
 Unicode:
 
-`{ yield E(a) ∣ a ∈ A ∧ P(a) }`
+`{ yield E(a) ∣ a ∈ A ∣ P(a) }`
 
 ASCII:
 
-`{ yield E(a) | a in A and P(a) }`
+`{ yield E(a) | a in A | P(a) }`
 
 If `yield` is absent, yield the bound variable.
+
+Grammar note (Normative):
+
+- In the standalone grammar, the generator and the optional predicate are separated explicitly.
+- The generator is `IDENT ∈ Expr` or `IDENT in Expr`.
+- If a predicate is present, it follows a second separator `∣` or `|`.
+- The standalone core does **not** treat `a ∈ A ∧ P(a)` as shorthand for a generator plus predicate.
 
 ### 9.3 Predicate language
 
@@ -646,7 +695,7 @@ Example:
 Projection example:
 
 ```
-{ yield b⟨val⟩ ∣ b ∈ headers ∧ b⟨key⟩ = "content-type" }
+{ yield b⟨val⟩ ∣ b ∈ headers ∣ b⟨key⟩ = "content-type" }
 ```
 
 Carrier preservation:
@@ -655,7 +704,10 @@ Carrier preservation:
 
 Important:
 
-- If the comprehension yields bindings (via `yield k -> v` or `yield Bind(k,v)`), the result is still a `Bag` (of `Bind` values), not a `BagKV`.
+- If the comprehension yields bindings, the result is still a `Bag` (of `Bind` values), not a `BagKV`.
+- In the standalone surface, such a yield should be written using the explicit constructor:
+  - `yield Bind(k, v)`
+- Hosts MAY offer `yield k -> v` as profile sugar, but that is not required for standalone conformance.
 - To treat that result as a keyed bag again, the program must convert explicitly:
   - `asBagKV(bagOfBindings) -> Res[BagKV]`
 
@@ -690,6 +742,12 @@ Formally:
 - Evaluate `R` in an environment where `• = v` (Unicode surface) or `_ = v` (ASCII surface).
 - The value of the expression is the result of evaluating `R`.
 
+No implicit application rule:
+
+- `|>` does **not** mean implicit function argument insertion.
+- In particular, `x |> f()` is **not** shorthand for `f(x)` in the standalone profile.
+- Any use of the piped value on the right-hand side must be expressed through the placeholder or through host-defined sugar that preserves the same meaning.
+
 The placeholder is read-only, cannot be declared or assigned, and is scoped only
 to the right-hand side of the nearest enclosing `|>`.
 
@@ -717,7 +775,7 @@ Examples:
 
 ```
 input
-|> normalizeUnique()
+|> normalizeUnique(_)
 |> •<"content-type">!
 ```
 
@@ -893,6 +951,8 @@ Boundary note:
 - These stable codes constrain the language boundary where SDA itself defines failure.
 - Static validity and dynamic failure are two views of the same core semantics; hosts may choose
   earlier rejection, but may not assign different meanings to the underlying condition.
+- This specification assigns stable tags only to SDA-defined semantic conditions.
+- Other standalone or host diagnostics may exist, but they are not part of the core SDA error algebra unless this specification assigns them a stable tag.
 - Parser wording, host exception types, source spans, IDE diagnostics, and other rendering details are
   part of the standalone profile or host tooling, not the mathematical core.
 - Where this specification names a stable tag for a parse-time or compile-time condition, conformance
@@ -936,7 +996,7 @@ For `b = BagKV{ "k" -> 1, "k" -> 2 }`:
 ### 13.5 Building BagKV via comprehension + explicit conversion
 
 ```
-let pairs = { yield "x" -> 1 ∣ a ∈ Seq[1,2,3] };
+let pairs = { yield Bind("x", 1) ∣ a ∈ Seq[1,2,3] };
 let headersRes = asBagKV(pairs);
 let headers = bindRes(headersRes, h => h);   ;; explicit Bag -> BagKV with explicit unwrapping
 ```
@@ -945,7 +1005,7 @@ let headers = bindRes(headersRes, h => h);   ;; explicit Bag -> BagKV with expli
 
 ```
 input
-|> normalizeUnique()                 ;; Res[Map]
+|> normalizeUnique(_)               ;; Res[Map]
 |> bindRes(_, m => m<"content-type">!)
 ```
 
@@ -970,6 +1030,8 @@ A conforming SDA implementation MUST:
 9. If claiming standalone profile conformance, implement the helper contracts in §11.2 exactly.
 10. Implement equality for every comparable core value kind exactly as defined in §1.2.
 11. Preserve the same semantic condition whether a core error is detected statically or during evaluation.
+12. Treat `|>` as placeholder-based composition unless documenting a host extension that preserves the same core meaning.
+13. Treat `Bind(k, v)` as the standalone binding constructor, and not require general `k -> v` expression sugar for standalone conformance.
 
 ### 14.1 Minimal conformance suite outline (Informative)
 
@@ -1053,20 +1115,20 @@ Add       ::= Mul { ("+" | "-") Mul }
 Mul       ::= Unary { ("*" | "/") Unary }
 Unary     ::= { ("-" ) } Postfix
 
-Postfix   ::= Primary { SelectorAccess }
+Postfix   ::= Primary { SelectorAccess | CallSuffix }
 SelectorAccess ::= "<" Selector ">" [ "?" | "!" ]
               |  "⟨" Selector "⟩" [ "?" | "!" ]
+CallSuffix ::= "(" [ Args ] ")"
 
 Primary   ::= Literal
+          |  Compr
           |  IDENT
           |  Placeholder
-          |  Call
           |  Lambda
           |  "(" Expr ")"
 
 Placeholder ::= "_" | "•"
 
-Call      ::= IDENT "(" [ Args ] ")"
 Args      ::= Expr { "," Expr }
 
 Lambda    ::= IDENT ("=>" | "↦") Expr
@@ -1087,9 +1149,15 @@ Selector shorthand:
 ```
 Literal   ::= Null | Bool | NUM | STRING
           |  SeqLit | SetLit | BagLit | MapLit | ProdLit | BagKVLit
+          |  SomeLit | NoneLit | OkLit | FailLit | BytesLit
 
-Null      ::= "Null"
+Null      ::= "null"    ;; standalone reserved word; case-insensitive in the repository profile
 Bool      ::= "true" | "false"
+BytesLit  ::= "Bytes" "(" STRING ")"   ;; constructor spelling shown canonically; standalone keywords are case-insensitive
+SomeLit   ::= "Some" "(" Expr ")"
+NoneLit   ::= "None"
+OkLit     ::= "Ok" "(" Expr ")"
+FailLit   ::= "Fail" "(" Expr "," Expr ")"
 
 SeqLit    ::= "Seq" "[" [ ExprList ] "]"
 SetLit    ::= "Set" "{" [ ExprList ] "}"
@@ -1122,7 +1190,7 @@ Pred      ::= Expr
 
 Examples:
 - `{ a in A | a<name> = "steve" }`
-- `{ yield a<city> | a ∈ A ∧ a<name> = "steve" }`
+- `{ yield a<city> | a ∈ A | a<name> = "steve" }`
 
 ```
 
@@ -1184,7 +1252,7 @@ SDA:
 
 ```
 headers
-|> normalizeUnique()
+|> normalizeUnique(_)
 |> bindRes(_, m => m<"content-type">!)
 ```
 
@@ -1201,7 +1269,7 @@ VAR
   program: STRING;
 
 BEGIN
-  program := "headers |> normalizeUnique() |> bindRes(_, m => m<\"content-type\">!)";
+  program := "headers |> normalizeUnique(_) |> bindRes(_, m => m<\"content-type\">!)";
   out := SDA.Eval(program, headers);
 END Headers.
 ```
