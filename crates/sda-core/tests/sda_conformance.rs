@@ -1,7 +1,11 @@
-use sda_core::{run, SdaError};
+use sda_core::{run, run_with_input_binding, SdaError};
 
 fn run_json(expr: &str) -> serde_json::Value {
     run(expr, serde_json::Value::Null).expect("run failed")
+}
+
+fn run_json_with_input(expr: &str, binding: &str, input: serde_json::Value) -> serde_json::Value {
+    run_with_input_binding(expr, binding, input).expect("run failed")
 }
 
 fn assert_same_result(expr_a: &str, expr_b: &str) {
@@ -28,6 +32,17 @@ fn assert_parse_error(expr: &str, expected_code: &str, expected_msg: &str) {
             assert!(rendered.contains(expected_msg), "missing msg in error: {rendered}");
         }
         other => panic!("expected parse error, got {other:?}"),
+    }
+}
+
+fn assert_eval_error(expr: &str, expected_msg: &str) {
+    let err = run(expr, serde_json::Value::Null).expect_err("expected eval error");
+    match err {
+        SdaError::Eval(eval_err) => {
+            let rendered = eval_err.to_string();
+            assert!(rendered.contains(expected_msg), "missing msg in error: {rendered}");
+        }
+        other => panic!("expected eval error, got {other:?}"),
     }
 }
 
@@ -299,6 +314,44 @@ mod section_8_algebra {
     }
 }
 
+mod section_9_comprehensions {
+    use super::*;
+
+    #[test]
+    fn seq_comprehension_filters_in_place() {
+        assert_eq!(
+            run_json(r#"{ a in Seq[1, 2, 3] | a > 1 };"#),
+            serde_json::json!([2, 3])
+        );
+    }
+
+    #[test]
+    fn seq_comprehension_yield_projects_values() {
+        assert_eq!(
+            run_json(r#"{ yield a + 1 | a in Seq[1, 2, 3] | a < 3 };"#),
+            serde_json::json!([2, 3])
+        );
+    }
+
+    #[test]
+    fn bagkv_comprehension_exposes_bind_values() {
+        assert_eq!(
+            run_json(r#"{ yield a<val> | a in BagKV{"x" -> 1, "y" -> 2} };"#),
+            serde_json::json!({"$type": "bag", "$items": [1, 2]})
+        );
+    }
+
+    #[test]
+    fn non_iterable_comprehension_source_is_wrong_shape() {
+        assert_fail(r#"{ a in 1 | true };"#, "t_sda_wrong_shape", "wrong shape");
+    }
+
+    #[test]
+    fn non_bool_comprehension_predicate_is_wrong_shape() {
+        assert_fail(r#"{ a in Seq[1] | 1 };"#, "t_sda_wrong_shape", "wrong shape");
+    }
+}
+
 mod section_10_pipe {
     use super::*;
 
@@ -306,10 +359,48 @@ mod section_10_pipe {
     fn unbound_placeholder_is_stable() {
         assert_fail("_;", "t_sda_unbound_placeholder", "unbound placeholder");
     }
+
+    #[test]
+    fn placeholder_pipeline_composes_explicitly() {
+        assert_eq!(
+            run_json(r#"Seq[1, 2] |> _ ++ Seq[3];"#),
+            serde_json::json!([1, 2, 3])
+        );
+    }
+
+    #[test]
+    fn pipe_does_not_insert_implicit_argument() {
+        assert_eval_error(r#"BagKV{"k" -> 1} |> normalizeUnique();"#, "Arity mismatch");
+    }
 }
 
 mod section_11_core_functions {
     use super::*;
+
+    #[test]
+    fn keys_helper_returns_wrong_shape_for_non_map() {
+        assert_fail(r#"keys(Seq[1]);"#, "t_sda_wrong_shape", "wrong shape");
+    }
+
+    #[test]
+    fn values_helper_returns_wrong_shape_for_non_map() {
+        assert_fail(r#"values(Seq[1]);"#, "t_sda_wrong_shape", "wrong shape");
+    }
+
+    #[test]
+    fn count_helper_returns_wrong_shape_for_non_bag() {
+        assert_fail(r#"count(1, Seq[1]);"#, "t_sda_wrong_shape", "wrong shape");
+    }
+
+    #[test]
+    fn bind_opt_returns_wrong_shape_for_non_option() {
+        assert_fail(r#"bindOpt(1, x => Some(x));"#, "t_sda_wrong_shape", "wrong shape");
+    }
+
+    #[test]
+    fn bind_res_returns_wrong_shape_for_non_result() {
+        assert_fail(r#"bindRes(1, x => Ok(x));"#, "t_sda_wrong_shape", "wrong shape");
+    }
 
     #[test]
     fn or_else_opt_preserves_option_wrapper() {
@@ -324,6 +415,63 @@ mod section_11_core_functions {
         assert_eq!(
             run_json(r#"orElseRes(Ok(1), Ok(2));"#),
             serde_json::json!({"$type": "ok", "$value": 1})
+        );
+    }
+}
+
+mod section_11_standalone_helpers {
+    use super::*;
+
+    #[test]
+    fn membership_on_seq_is_supported() {
+        assert_eq!(run_json("2 in Seq[1, 2, 3];"), serde_json::json!(true));
+    }
+
+    #[test]
+    fn membership_on_map_uses_string_keys() {
+        assert_eq!(run_json(r#""name" in Map{"name" -> 1};"#), serde_json::json!(true));
+    }
+
+    #[test]
+    fn membership_on_prod_uses_field_names() {
+        assert_eq!(run_json(r#""name" in Prod{name: 1};"#), serde_json::json!(true));
+    }
+
+    #[test]
+    fn membership_on_map_requires_string_probe() {
+        assert_fail(r#"1 in Map{"name" -> 1};"#, "t_sda_wrong_shape", "wrong shape");
+    }
+}
+
+mod section_13_worked_examples {
+    use super::*;
+
+    #[test]
+    fn jsonish_filter_example_replays() {
+        let input = serde_json::json!([
+            {"$type": "prod", "$fields": {"name": "steve", "city": "la"}},
+            {"$type": "prod", "$fields": {"name": "steve", "city": "ny"}},
+            {"$type": "prod", "$fields": {"name": "ada", "city": "la"}}
+        ]);
+
+        assert_eq!(
+            run_json_with_input(
+                r#"{ a in A | a<name> = "steve" and a<city> in Set{"la","ny"} };"#,
+                "A",
+                input,
+            ),
+            serde_json::json!([
+                {"$type": "prod", "$fields": {"city": "la", "name": "steve"}},
+                {"$type": "prod", "$fields": {"city": "ny", "name": "steve"}}
+            ])
+        );
+    }
+
+    #[test]
+    fn explicit_bind_comprehension_example_replays() {
+        assert_eq!(
+            run_json(r#"{ yield Bind("x", 1) | a in Seq[1] };"#),
+            serde_json::json!([{"$type": "bind", "$key": "x", "$val": 1}])
         );
     }
 }

@@ -23,6 +23,10 @@ pub fn call_stdlib(name: &str, args: Vec<Value>) -> Option<Result<Value, EvalErr
     }
 }
 
+fn wrong_shape() -> Value {
+    Value::Fail_("t_sda_wrong_shape".to_string(), "wrong shape".to_string())
+}
+
 fn check_arity(_name: &str, args: &[Value], expected: usize) -> Result<(), EvalError> {
     if args.len() != expected {
         Err(EvalError::ArityMismatch {
@@ -67,7 +71,7 @@ fn stdlib_keys(args: Vec<Value>) -> Result<Value, EvalError> {
                 .map(|(k, _)| Value::Str(k.clone()))
                 .collect(),
         )),
-        other => Err(EvalError::TypeError(format!("keys() requires map, got {other:?}"))),
+        _ => Ok(wrong_shape()),
     }
 }
 
@@ -79,7 +83,7 @@ fn stdlib_values(args: Vec<Value>) -> Result<Value, EvalError> {
             sorted.sort_by(|(left_key, _), (right_key, _)| left_key.cmp(right_key));
             Ok(Value::Seq(sorted.into_iter().map(|(_, v)| v).collect()))
         }
-        other => Err(EvalError::TypeError(format!("values() requires map, got {other:?}"))),
+        _ => Ok(wrong_shape()),
     }
 }
 
@@ -88,19 +92,19 @@ fn stdlib_count(args: Vec<Value>) -> Result<Value, EvalError> {
     let mut iter = args.into_iter();
     let needle = iter.next().unwrap();
     let haystack = iter.next().unwrap();
-    ensure_comparable(&needle)?;
+    if ensure_comparable(&needle).is_err() {
+        return Ok(wrong_shape());
+    }
     let n = match &haystack {
         Value::Bag(items) => {
             for item in items {
-                ensure_comparable(item)?;
+                if ensure_comparable(item).is_err() {
+                    return Ok(wrong_shape());
+                }
             }
             items.iter().filter(|v| *v == &needle).count()
         }
-        other => {
-            return Err(EvalError::TypeError(format!(
-                "count() requires bag as second arg, got {other:?}"
-            )))
-        }
+        _ => return Ok(wrong_shape()),
     };
     Ok(Value::Num(ExactNum::from_usize(n)))
 }
@@ -256,7 +260,7 @@ fn stdlib_map_opt(args: Vec<Value>) -> Result<Value, EvalError> {
             Ok(Value::Some_(Box::new(result)))
         }
         Value::None_ => Ok(Value::None_),
-        other => Err(EvalError::TypeError(format!("mapOpt requires some/none, got {other:?}"))),
+        _ => Ok(wrong_shape()),
     }
 }
 
@@ -268,7 +272,7 @@ fn stdlib_bind_opt(args: Vec<Value>) -> Result<Value, EvalError> {
     match opt {
         Value::Some_(inner) => apply_lambda(f, vec![*inner]),
         Value::None_ => Ok(Value::None_),
-        other => Err(EvalError::TypeError(format!("bindOpt requires some/none, got {other:?}"))),
+        _ => Ok(wrong_shape()),
     }
 }
 
@@ -280,7 +284,7 @@ fn stdlib_or_else_opt(args: Vec<Value>) -> Result<Value, EvalError> {
     match opt {
         Value::Some_(inner) => Ok(Value::Some_(inner)),
         Value::None_ => Ok(default),
-        other => Err(EvalError::TypeError(format!("orElseOpt requires some/none, got {other:?}"))),
+        _ => Ok(wrong_shape()),
     }
 }
 
@@ -295,7 +299,7 @@ fn stdlib_map_res(args: Vec<Value>) -> Result<Value, EvalError> {
             Ok(Value::Ok_(Box::new(result)))
         }
         Value::Fail_(c, m) => Ok(Value::Fail_(c, m)),
-        other => Err(EvalError::TypeError(format!("mapRes requires ok/fail, got {other:?}"))),
+        _ => Ok(wrong_shape()),
     }
 }
 
@@ -307,7 +311,7 @@ fn stdlib_bind_res(args: Vec<Value>) -> Result<Value, EvalError> {
     match res {
         Value::Ok_(inner) => apply_lambda(f, vec![*inner]),
         Value::Fail_(c, m) => Ok(Value::Fail_(c, m)),
-        other => Err(EvalError::TypeError(format!("bindRes requires ok/fail, got {other:?}"))),
+        _ => Ok(wrong_shape()),
     }
 }
 
@@ -319,6 +323,6 @@ fn stdlib_or_else_res(args: Vec<Value>) -> Result<Value, EvalError> {
     match res {
         Value::Ok_(inner) => Ok(Value::Ok_(inner)),
         Value::Fail_(_, _) => Ok(default),
-        other => Err(EvalError::TypeError(format!("orElseRes requires ok/fail, got {other:?}"))),
+        _ => Ok(wrong_shape()),
     }
 }

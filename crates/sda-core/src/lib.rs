@@ -158,6 +158,18 @@ pub fn run_with_input_binding(
     input: serde_json::Value,
 ) -> Result<serde_json::Value, SdaError> {
     let input_val = from_json(input);
+    let program = parse_source(expr)?;
+    let mut env = Env::new();
+    env.insert(binding_name.to_string(), input_val);
+    let result = eval::eval_program(&program, &mut env)?;
+    Ok(to_json(result.unwrap_or(Value::Null)))
+}
+
+pub fn check(expr: &str) -> Result<(), SdaError> {
+    parse_source(expr).map(|_| ())
+}
+
+fn parse_source(expr: &str) -> Result<ast::Program, SdaError> {
     let expr_normalized = {
         let trimmed = expr.trim_end();
         if trimmed.ends_with(';') {
@@ -168,10 +180,7 @@ pub fn run_with_input_binding(
     };
     let tokens = lexer::lex(&expr_normalized)?;
     let program = parser::parse(tokens)?;
-    let mut env = Env::new();
-    env.insert(binding_name.to_string(), input_val);
-    let result = eval::eval_program(&program, &mut env)?;
-    Ok(to_json(result.unwrap_or(Value::Null)))
+    Ok(program)
 }
 
 pub fn from_json(v: serde_json::Value) -> Value {
@@ -947,8 +956,10 @@ mod tests {
 
     #[test]
     fn test_values_prod_is_not_a_standalone_helper_contract() {
-        let err = run(r#"values(Prod{b: 2, a: 1});"#, serde_json::Value::Null).unwrap_err();
-        assert!(err.to_string().contains("values() requires map"));
+        assert_eq!(
+            r(r#"values(Prod{b: 2, a: 1});"#),
+            serde_json::json!({"$type": "fail", "$code": "t_sda_wrong_shape", "$msg": "wrong shape"})
+        );
     }
 
     #[test]
@@ -1031,14 +1042,18 @@ mod tests {
 
     #[test]
     fn test_keys_prod_is_not_a_standalone_helper_contract() {
-        let err = run(r#"keys(Prod{b: 2, a: 1});"#, serde_json::Value::Null).unwrap_err();
-        assert!(err.to_string().contains("keys() requires map"));
+        assert_eq!(
+            r(r#"keys(Prod{b: 2, a: 1});"#),
+            serde_json::json!({"$type": "fail", "$code": "t_sda_wrong_shape", "$msg": "wrong shape"})
+        );
     }
 
     #[test]
     fn test_count_seq_is_not_a_standalone_helper_contract() {
-        let err = run(r#"count(1, Seq[1, 2, 1]);"#, serde_json::Value::Null).unwrap_err();
-        assert!(err.to_string().contains("count() requires bag as second arg"));
+        assert_eq!(
+            r(r#"count(1, Seq[1, 2, 1]);"#),
+            serde_json::json!({"$type": "fail", "$code": "t_sda_wrong_shape", "$msg": "wrong shape"})
+        );
     }
 
     #[test]
@@ -1087,11 +1102,15 @@ mod tests {
 
     #[test]
     fn test_function_values_are_not_comparable() {
-        let eq_err = run(r#"let f = x => x; f = f;"#, serde_json::Value::Null).unwrap_err();
-        assert!(eq_err.to_string().contains("function values are not comparable"));
+        assert_eq!(
+            r(r#"let f = x => x; f = f;"#),
+            serde_json::json!({"$type": "fail", "$code": "t_sda_wrong_shape", "$msg": "wrong shape"})
+        );
 
-        let set_err = run(r#"Set{x => x};"#, serde_json::Value::Null).unwrap_err();
-        assert!(set_err.to_string().contains("function values are not comparable"));
+        assert_eq!(
+            r(r#"Set{x => x};"#),
+            serde_json::json!({"$type": "fail", "$code": "t_sda_wrong_shape", "$msg": "wrong shape"})
+        );
     }
 
     #[test]

@@ -23,6 +23,14 @@ pub enum EvalError {
     ArityMismatch { expected: usize, got: usize },
 }
 
+fn fail_value(code: &str, msg: &str) -> Value {
+    Value::Fail_(code.to_string(), msg.to_string())
+}
+
+fn wrong_shape_value() -> Value {
+    fail_value("t_sda_wrong_shape", "wrong shape")
+}
+
 pub(crate) fn ensure_comparable(value: &Value) -> Result<(), EvalError> {
     match value {
         Value::Null
@@ -92,7 +100,9 @@ pub fn eval_expr(expr: &Expr, env: &Env) -> Result<Value, EvalError> {
             let mut values = Vec::new();
             for item in items {
                 let value = eval_expr(item, env)?;
-                ensure_comparable(&value)?;
+                if ensure_comparable(&value).is_err() {
+                    return Ok(wrong_shape_value());
+                }
                 if !values.iter().any(|existing| values_equal(existing, &value)) {
                     values.push(value);
                 }
@@ -180,11 +190,11 @@ pub fn eval_expr(expr: &Expr, env: &Env) -> Result<Value, EvalError> {
             match op {
                 UnOpKind::Neg => match value {
                     Value::Num(n) => Ok(Value::Num(n.neg())),
-                    other => Err(EvalError::TypeError(format!("Cannot negate {other:?}"))),
+                    _ => Ok(wrong_shape_value()),
                 },
                 UnOpKind::Not => match value {
                     Value::Bool(b) => Ok(Value::Bool(!b)),
-                    other => Err(EvalError::TypeError(format!("Cannot not {other:?}"))),
+                    _ => Ok(wrong_shape_value()),
                 },
             }
         }
@@ -217,11 +227,7 @@ pub fn eval_expr(expr: &Expr, env: &Env) -> Result<Value, EvalError> {
                         .collect(),
                     Carrier::Bag,
                 ),
-                other => {
-                    return Err(EvalError::TypeError(format!(
-                        "Cannot iterate over {other:?}"
-                    )))
-                }
+                _ => return Ok(wrong_shape_value()),
             };
 
             let mut results = Vec::new();
@@ -234,11 +240,7 @@ pub fn eval_expr(expr: &Expr, env: &Env) -> Result<Value, EvalError> {
                     match pred_val {
                         Value::Bool(false) => continue,
                         Value::Bool(true) => {}
-                        other => {
-                            return Err(EvalError::TypeError(format!(
-                                "Predicate must be bool, got {other:?}"
-                            )))
-                        }
+                        _ => return Ok(wrong_shape_value()),
                     }
                 }
 
@@ -256,7 +258,9 @@ pub fn eval_expr(expr: &Expr, env: &Env) -> Result<Value, EvalError> {
                 Carrier::Set => {
                     let mut dedup = Vec::new();
                     for value in results {
-                        ensure_comparable(&value)?;
+                        if ensure_comparable(&value).is_err() {
+                            return Ok(wrong_shape_value());
+                        }
                         if !dedup.iter().any(|existing| values_equal(existing, &value)) {
                             dedup.push(value);
                         }
@@ -375,15 +379,15 @@ fn eval_binop(op: &BinOpKind, lhs: Value, rhs: Value) -> Result<Value, EvalError
     match op {
         BinOpKind::Add => match (lhs, rhs) {
             (Value::Num(a), Value::Num(b)) => Ok(Value::Num(a.add(&b))),
-            (a, b) => Err(EvalError::TypeError(format!("Cannot add {a:?} and {b:?}"))),
+            _ => Ok(wrong_shape_value()),
         },
         BinOpKind::Sub => match (lhs, rhs) {
             (Value::Num(a), Value::Num(b)) => Ok(Value::Num(a.sub(&b))),
-            (a, b) => Err(EvalError::TypeError(format!("Cannot subtract {a:?} and {b:?}"))),
+            _ => Ok(wrong_shape_value()),
         },
         BinOpKind::Mul => match (lhs, rhs) {
             (Value::Num(a), Value::Num(b)) => Ok(Value::Num(a.mul(&b))),
-            (a, b) => Err(EvalError::TypeError(format!("Cannot multiply {a:?} and {b:?}"))),
+            _ => Ok(wrong_shape_value()),
         },
         BinOpKind::Div => match (lhs, rhs) {
             (Value::Num(a), Value::Num(b)) => {
@@ -393,7 +397,7 @@ fn eval_binop(op: &BinOpKind, lhs: Value, rhs: Value) -> Result<Value, EvalError
                     Ok(Value::Num(a.div(&b)))
                 }
             }
-            (a, b) => Err(EvalError::TypeError(format!("Cannot divide {a:?} and {b:?}"))),
+            _ => Ok(wrong_shape_value()),
         },
         BinOpKind::Concat => match (lhs, rhs) {
             (Value::Str(a), Value::Str(b)) => Ok(Value::Str(a + &b)),
@@ -401,45 +405,47 @@ fn eval_binop(op: &BinOpKind, lhs: Value, rhs: Value) -> Result<Value, EvalError
                 a.extend(b);
                 Ok(Value::Seq(a))
             }
-            (a, b) => Err(EvalError::TypeError(format!("Cannot concat {a:?} and {b:?}"))),
+            _ => Ok(wrong_shape_value()),
         },
         BinOpKind::Eq => {
-            ensure_comparable(&lhs)?;
-            ensure_comparable(&rhs)?;
+            if ensure_comparable(&lhs).is_err() || ensure_comparable(&rhs).is_err() {
+                return Ok(wrong_shape_value());
+            }
             Ok(Value::Bool(values_equal(&lhs, &rhs)))
         }
         BinOpKind::Neq => {
-            ensure_comparable(&lhs)?;
-            ensure_comparable(&rhs)?;
+            if ensure_comparable(&lhs).is_err() || ensure_comparable(&rhs).is_err() {
+                return Ok(wrong_shape_value());
+            }
             Ok(Value::Bool(!values_equal(&lhs, &rhs)))
         }
         BinOpKind::Lt => match (lhs, rhs) {
             (Value::Num(a), Value::Num(b)) => Ok(Value::Bool(a < b)),
             (Value::Str(a), Value::Str(b)) => Ok(Value::Bool(a < b)),
-            (a, b) => Err(EvalError::TypeError(format!("Cannot compare {a:?} and {b:?}"))),
+            _ => Ok(wrong_shape_value()),
         },
         BinOpKind::Le => match (lhs, rhs) {
             (Value::Num(a), Value::Num(b)) => Ok(Value::Bool(a <= b)),
             (Value::Str(a), Value::Str(b)) => Ok(Value::Bool(a <= b)),
-            (a, b) => Err(EvalError::TypeError(format!("Cannot compare {a:?} and {b:?}"))),
+            _ => Ok(wrong_shape_value()),
         },
         BinOpKind::Gt => match (lhs, rhs) {
             (Value::Num(a), Value::Num(b)) => Ok(Value::Bool(a > b)),
             (Value::Str(a), Value::Str(b)) => Ok(Value::Bool(a > b)),
-            (a, b) => Err(EvalError::TypeError(format!("Cannot compare {a:?} and {b:?}"))),
+            _ => Ok(wrong_shape_value()),
         },
         BinOpKind::Ge => match (lhs, rhs) {
             (Value::Num(a), Value::Num(b)) => Ok(Value::Bool(a >= b)),
             (Value::Str(a), Value::Str(b)) => Ok(Value::Bool(a >= b)),
-            (a, b) => Err(EvalError::TypeError(format!("Cannot compare {a:?} and {b:?}"))),
+            _ => Ok(wrong_shape_value()),
         },
         BinOpKind::And => match (lhs, rhs) {
             (Value::Bool(a), Value::Bool(b)) => Ok(Value::Bool(a && b)),
-            (a, b) => Err(EvalError::TypeError(format!("Cannot 'and' {a:?} and {b:?}"))),
+            _ => Ok(wrong_shape_value()),
         },
         BinOpKind::Or => match (lhs, rhs) {
             (Value::Bool(a), Value::Bool(b)) => Ok(Value::Bool(a || b)),
-            (a, b) => Err(EvalError::TypeError(format!("Cannot 'or' {a:?} and {b:?}"))),
+            _ => Ok(wrong_shape_value()),
         },
         BinOpKind::Union => match (lhs, rhs) {
             (Value::Set(mut a), Value::Set(b)) => {
@@ -450,7 +456,7 @@ fn eval_binop(op: &BinOpKind, lhs: Value, rhs: Value) -> Result<Value, EvalError
                 }
                 Ok(Value::Set(a))
             }
-            (a, b) => Err(EvalError::TypeError(format!("Union requires sets, got {a:?} and {b:?}"))),
+            _ => Ok(wrong_shape_value()),
         },
         BinOpKind::Inter => match (lhs, rhs) {
             (Value::Set(a), Value::Set(b)) => {
@@ -460,7 +466,7 @@ fn eval_binop(op: &BinOpKind, lhs: Value, rhs: Value) -> Result<Value, EvalError
                     .collect();
                 Ok(Value::Set(result))
             }
-            (a, b) => Err(EvalError::TypeError(format!("Inter requires sets, got {a:?} and {b:?}"))),
+            _ => Ok(wrong_shape_value()),
         },
         BinOpKind::Diff => match (lhs, rhs) {
             (Value::Set(a), Value::Set(b)) => {
@@ -470,14 +476,14 @@ fn eval_binop(op: &BinOpKind, lhs: Value, rhs: Value) -> Result<Value, EvalError
                     .collect();
                 Ok(Value::Set(result))
             }
-            (a, b) => Err(EvalError::TypeError(format!("Diff requires sets, got {a:?} and {b:?}"))),
+            _ => Ok(wrong_shape_value()),
         },
         BinOpKind::BUnion => match (lhs, rhs) {
             (Value::Bag(mut a), Value::Bag(b)) => {
                 a.extend(b);
                 Ok(Value::Bag(a))
             }
-            (a, b) => Err(EvalError::TypeError(format!("BUnion requires bags, got {a:?} and {b:?}"))),
+            _ => Ok(wrong_shape_value()),
         },
         BinOpKind::BDiff => match (lhs, rhs) {
             (Value::Bag(a), Value::Bag(b)) => {
@@ -495,27 +501,39 @@ fn eval_binop(op: &BinOpKind, lhs: Value, rhs: Value) -> Result<Value, EvalError
                     .collect();
                 Ok(Value::Bag(result))
             }
-            (a, b) => Err(EvalError::TypeError(format!("BDiff requires bags, got {a:?} and {b:?}"))),
+            _ => Ok(wrong_shape_value()),
         },
         BinOpKind::In => match rhs {
             Value::Seq(items) => {
-                ensure_comparable(&lhs)?;
+                if ensure_comparable(&lhs).is_err() {
+                    return Ok(wrong_shape_value());
+                }
                 for item in &items {
-                    ensure_comparable(item)?;
+                    if ensure_comparable(item).is_err() {
+                        return Ok(wrong_shape_value());
+                    }
                 }
                 Ok(Value::Bool(items.iter().any(|x| values_equal(x, &lhs))))
             }
             Value::Set(items) => {
-                ensure_comparable(&lhs)?;
+                if ensure_comparable(&lhs).is_err() {
+                    return Ok(wrong_shape_value());
+                }
                 for item in &items {
-                    ensure_comparable(item)?;
+                    if ensure_comparable(item).is_err() {
+                        return Ok(wrong_shape_value());
+                    }
                 }
                 Ok(Value::Bool(items.iter().any(|x| values_equal(x, &lhs))))
             }
             Value::Bag(items) => {
-                ensure_comparable(&lhs)?;
+                if ensure_comparable(&lhs).is_err() {
+                    return Ok(wrong_shape_value());
+                }
                 for item in &items {
-                    ensure_comparable(item)?;
+                    if ensure_comparable(item).is_err() {
+                        return Ok(wrong_shape_value());
+                    }
                 }
                 Ok(Value::Bool(items.iter().any(|x| values_equal(x, &lhs))))
             }
@@ -523,17 +541,17 @@ fn eval_binop(op: &BinOpKind, lhs: Value, rhs: Value) -> Result<Value, EvalError
                 if let Value::Str(key) = &lhs {
                     Ok(Value::Bool(entries.iter().any(|(k, _)| k == key)))
                 } else {
-                    Ok(Value::Bool(false))
+                    Ok(wrong_shape_value())
                 }
             }
             Value::Prod(fields) => {
                 if let Value::Str(key) = &lhs {
                     Ok(Value::Bool(fields.iter().any(|(k, _)| k == key)))
                 } else {
-                    Ok(Value::Bool(false))
+                    Ok(wrong_shape_value())
                 }
             }
-            other => Err(EvalError::TypeError(format!("Cannot check membership in {other:?}"))),
+            _ => Ok(wrong_shape_value()),
         },
     }
 }

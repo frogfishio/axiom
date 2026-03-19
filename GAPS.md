@@ -46,14 +46,17 @@ Decision note:
 ## Errors And Diagnostics
 
 - [x] Implement the remaining stable error tags listed in the SDA spec.
-- [ ] Freeze the final failure taxonomy across static rejection, SDA `Fail(code, msg)`, and profile / host diagnostics.
-- [ ] Separate runtime type and invocation errors from spec-stable `Fail(code, msg)` results according to that taxonomy.
+- [x] Freeze the final failure taxonomy across static rejection, SDA `Fail(code, msg)`, and profile / host diagnostics.
+- [x] Separate runtime type and invocation errors from spec-stable `Fail(code, msg)` results according to that taxonomy.
 - [ ] Improve parser diagnostics around selector ambiguity, invalid map keys, and unsupported comprehension forms.
 - [x] Add conformance tests for all stable error codes and message strings.
 
+Decision note:
+Standalone SDA now treats wrong-shape semantic misuse as SDA `Fail(t_sda_wrong_shape, "wrong shape")` across operators, comprehensions, helpers, and core combinators. Parse-time/static conditions remain parse diagnostics. Invocation-level concerns such as unbound names, bad call arity, division by zero, and not-callable values remain host/profile diagnostics for now.
+
 ## CLI And Tooling
 
-- [ ] Replace the ad hoc positional CLI with the intended command surface (`eval`, `check`, `fmt` at minimum).
+- [x] Replace the ad hoc positional CLI with the intended command surface (`eval`, `check`, `fmt` at minimum).
 - [ ] Add fixture-driven CLI tests that exercise stdin, file input, stdout, and failure exits.
 - [ ] Add a formatter or canonical pretty-printer plan for SDA source.
 - [ ] Decide whether `cargo sda-run` remains a developer alias only or becomes part of documented workflow.
@@ -63,11 +66,11 @@ Decision note:
 - [x] Build a spec-indexed conformance suite layout separate from implementation unit tests.
 - [x] Add tests for selector semantics on `Map`, `Prod`, and `BagKV` edge cases.
 - [x] Add finite-corpus law tests for set, bag, and map algebra where determinism matters.
-- [ ] Add full spec-indexed conformance coverage for `§9 Comprehensions`.
-- [ ] Add full spec-indexed conformance coverage for `§10 Pipe` beyond unbound-placeholder cases.
-- [ ] Add conformance coverage for standalone membership on `Seq`, `Map`, and `Prod`.
-- [ ] Add conformance coverage for standalone helper misuse and success cases (`typeOf`, `keys`, `values`, `count`).
-- [ ] Add regression tests that replay the worked examples in `SDA/SDA_SPEC.md`.
+- [x] Add full spec-indexed conformance coverage for `§9 Comprehensions`.
+- [x] Add full spec-indexed conformance coverage for `§10 Pipe` beyond unbound-placeholder cases.
+- [x] Add conformance coverage for standalone membership on `Seq`, `Map`, and `Prod`.
+- [x] Add conformance coverage for standalone helper misuse and success cases (`typeOf`, `keys`, `values`, `count`).
+- [x] Add regression tests that replay the worked examples in `SDA/SDA_SPEC.md`.
 - [ ] Add regression tests proving the standalone profile's explicit choices:
 	- no implicit pipe argument insertion
 	- no required general `k -> v` expression sugar
